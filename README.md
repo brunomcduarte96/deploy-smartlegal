@@ -1,0 +1,2 @@
+# deploy-smartlegal
+superapp smartlegal
