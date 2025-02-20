@@ -1,12 +1,13 @@
 import os
 from dotenv import load_dotenv
+import streamlit as st
 
 # Carrega variáveis de ambiente
 load_dotenv()
 
 # Configurações do Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 # Configurações do Google
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS")

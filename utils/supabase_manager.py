@@ -1,6 +1,7 @@
 from supabase import create_client, Client
 from config.settings import SUPABASE_URL, SUPABASE_KEY
 from typing import Dict, Any, List
+import streamlit as st
 
 class SupabaseManager:
     def __init__(self):
@@ -107,4 +108,16 @@ class SupabaseManager:
 
 def init_supabase() -> Client:
     """Inicializa o cliente Supabase"""
-    return create_client(SUPABASE_URL, SUPABASE_KEY) 
+    try:
+        if not st.secrets.get("SUPABASE_URL"):
+            raise Exception("SUPABASE_URL não encontrada nas secrets")
+        if not st.secrets.get("SUPABASE_KEY"):
+            raise Exception("SUPABASE_KEY não encontrada nas secrets")
+            
+        return create_client(
+            st.secrets["SUPABASE_URL"],
+            st.secrets["SUPABASE_KEY"]
+        )
+    except Exception as e:
+        st.error(f"Erro ao inicializar Supabase: {str(e)}")
+        st.stop() 
