@@ -1,5 +1,5 @@
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -13,6 +13,8 @@ from config.settings import (
     SHEET_ID_2,
     ROOT_FOLDER_ID
 )
+from utils.date_utils import data_por_extenso
+from datetime import datetime
 
 class GoogleManager:
     def __init__(self):
@@ -91,31 +93,31 @@ class GoogleManager:
         except Exception as e:
             raise Exception(f"Erro ao fazer upload do arquivo: {str(e)}")
 
-    def fill_document_template(self, template_id: str, replacements: Dict[str, str]) -> str:
-        """Preenche um modelo do Google Docs com dados e salva como PDF"""
+    def fill_document_template(self, template_path: str, data: Dict[str, str], folder_id: str) -> Tuple[str, str]:
+        """
+        Preenche o template e salva como PDF e DOCX
+        Retorna: (pdf_id, docx_id)
+        """
         try:
-            # Verifica se tem acesso ao documento
-            try:
-                self.docs_service.documents().get(documentId=template_id).execute()
-            except Exception as e:
-                raise DriveError(f"Erro ao acessar template. Verifique as permissões: {str(e)}")
+            # Carrega o template
+            with open(template_path, 'rb') as doc:
+                doc_content = doc.read()
             
-            # Copia o template
-            try:
-                copied_file = self.drive_service.files().copy(
-                    fileId=template_id,
-                    body={'name': f'Preenchido_{template_id}'}
-                ).execute()
-            except Exception as e:
-                raise DriveError(f"Erro ao copiar template: {str(e)}")
+            # Upload do template para o Drive
+            temp_doc_id = self.upload_file(
+                "temp_template.docx",
+                doc_content,
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                folder_id
+            )
             
             # Prepara as substituições
             requests = []
-            for key, value in replacements.items():
+            for key, value in data.items():
                 requests.append({
                     'replaceAllText': {
                         'containsText': {
-                            'text': f'{{{key}}}',
+                            'text': f'{{{{{key}}}}}',
                             'matchCase': True
                         },
                         'replaceText': value
@@ -123,15 +125,31 @@ class GoogleManager:
                 })
             
             # Aplica as substituições
-            try:
-                self.docs_service.documents().batchUpdate(
-                    documentId=copied_file['id'],
-                    body={'requests': requests}
-                ).execute()
-            except Exception as e:
-                raise DriveError(f"Erro ao preencher documento: {str(e)}")
+            self.docs_service.documents().batchUpdate(
+                documentId=temp_doc_id,
+                body={'requests': requests}
+            ).execute()
             
-            return copied_file['id']
+            # Salva como DOCX
+            docx_id = self.drive_service.files().copy(
+                fileId=temp_doc_id,
+                body={'name': f'Procuracao_{data["nome_completo"]}.docx'}
+            ).execute()['id']
+            
+            # Exporta como PDF
+            pdf_content = self.export_to_pdf(temp_doc_id)
+            pdf_id = self.upload_file(
+                f'Procuracao_{data["nome_completo"]}.pdf',
+                pdf_content,
+                'application/pdf',
+                folder_id
+            )
+            
+            # Remove o arquivo temporário
+            self.drive_service.files().delete(fileId=temp_doc_id).execute()
+            
+            return pdf_id, docx_id
+            
         except Exception as e:
             raise DriveError(f"Erro ao processar template: {str(e)}")
 
@@ -145,27 +163,31 @@ class GoogleManager:
         except Exception as e:
             raise Exception(f"Erro ao exportar para PDF: {str(e)}")
 
-    def update_sheets_with_client_data(self, client_data: Dict[str, Any]):
+    def update_sheets_with_client_data(self, client_data: Dict[str, Any], folder_url: str):
         """Atualiza as duas planilhas com os dados do cliente"""
         try:
-            # Atualiza primeira planilha
-            values1 = [[
-                client_data['nome_completo'],
-                client_data['email'],
-                client_data['celular'],
-                client_data['caso'],
-                client_data['responsavel_comercial']
-            ]]
-            self.update_sheet(SHEET_ID_1, 'A:E', values1)
+            # Atualiza primeira planilha (todos os dados)
+            values1 = [[client_data[field] for field in [
+                'nome_completo', 'nacionalidade', 'estado_civil', 'profissao',
+                'email', 'celular', 'data_nascimento', 'rg', 'cpf',
+                'caso', 'assunto_caso', 'responsavel_comercial',
+                'endereco', 'bairro', 'cidade', 'estado', 'cep'
+            ]]]
+            self.update_sheet(SHEET_ID_1, 'A:Q', values1)
             
-            # Atualiza segunda planilha
+            # Atualiza segunda planilha (dados específicos)
+            current_date = datetime.now().strftime('%d/%m/%Y')
             values2 = [[
                 client_data['nome_completo'],
-                client_data['nacionalidade'],
-                client_data['estado_civil'],
-                client_data['profissao'],
-                client_data['cpf']
+                current_date,
+                client_data['responsavel_comercial'],
+                client_data['caso'],
+                client_data['assunto_caso'],
+                "Em andamento",
+                client_data['nome_completo'],
+                folder_url
             ]]
-            self.update_sheet(SHEET_ID_2, 'A:E', values2)
+            self.update_sheet(SHEET_ID_2, 'A:H', values2)
+            
         except Exception as e:
             raise Exception(f"Erro ao atualizar planilhas: {str(e)}") 

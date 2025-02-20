@@ -8,6 +8,7 @@ from datetime import datetime
 import pytz
 from utils.error_handler import handle_error
 import logging
+from utils.date_utils import data_por_extenso
 
 # Definir timezone de São Paulo
 SP_TZ = pytz.timezone('America/Sao_Paulo')
@@ -208,31 +209,35 @@ def render_onboarding():
                 # 4. Gerando documentos
                 status_text.text("Gerando documentos...")
                 progress_bar.progress(90)
-                google_manager.update_sheets_with_client_data(client_data)
-                try:
-                    logger.info(f"Iniciando preenchimento do template para {nome_completo}")
-                    template_data = {
-                        'nome': nome_completo,
-                        'cpf': cpf,
-                        'endereco': f"{endereco}, {bairro}, {cidade}/{estado}",
-                        'caso': caso,
-                        'data': format_sp_datetime(sp_now).split()[0]
-                    }
-                    doc_id = google_manager.fill_document_template(
-                        st.secrets["TEMPLATE_DOC_ID"], 
-                        template_data
-                    )
-                    logger.info(f"Template preenchido com sucesso. ID: {doc_id}")
-                except Exception as e:
-                    logger.error(f"Erro ao preencher template: {str(e)}")
-                    raise
-                pdf_content = google_manager.export_to_pdf(doc_id)
-                google_manager.upload_file(
-                    f"contrato_{nome_completo}.pdf",
-                    pdf_content,
-                    'application/pdf',
+                
+                # Prepara dados para o template
+                template_data = {
+                    'nome_completo': nome_completo,
+                    'nacionalidade': nacionalidade,
+                    'estado_civil': estado_civil,
+                    'profissao': profissao,
+                    'rg': rg,
+                    'cpf': cpf,
+                    'endereco': endereco,
+                    'bairro': bairro,
+                    'cep': cep,
+                    'cidade': cidade,
+                    'estado': estado,
+                    'data_extenso': data_por_extenso(sp_now)
+                }
+                
+                # Gera os documentos
+                pdf_id, docx_id = google_manager.fill_document_template(
+                    "Modelo Procuracao JEC.docx",
+                    template_data,
                     folder_id
                 )
+                
+                # Obtém URL da pasta
+                folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+                
+                # Atualiza planilhas
+                google_manager.update_sheets_with_client_data(client_data, folder_url)
                 
                 progress_bar.progress(100)
                 status_text.text("Concluído!")
