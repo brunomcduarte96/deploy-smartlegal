@@ -24,8 +24,14 @@ def init_managers():
 
 def create_form_section(title: str):
     """Cria uma seção do formulário com estilo consistente"""
-    st.markdown(f"### {title}")
-    st.markdown("---")
+    st.markdown(f"""
+        <h3 style="
+            color: #262730;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+        ">{title}</h3>
+    """, unsafe_allow_html=True)
 
 def handle_file_upload(file, folder_id: str, google_manager: GoogleManager):
     """Processa o upload de arquivo, convertendo para PDF se necessário"""
@@ -57,7 +63,7 @@ def handle_file_upload(file, folder_id: str, google_manager: GoogleManager):
             return None
     return None
 
-def main():
+def render_onboarding():
     st.title("Onboarding de Clientes")
     
     # Inicialização dos gerenciadores
@@ -84,9 +90,38 @@ def main():
         
         # Seção: Informações do Caso
         create_form_section("Informações do Caso")
-        caso = st.text_input("Caso")
-        assunto_caso = st.text_area("Assunto do Caso")
-        responsavel_comercial = st.text_input("Responsável Comercial")
+        col_caso1, col_caso2, col_caso3 = st.columns(3)
+        
+        with col_caso1:
+            caso = st.selectbox("Caso", [
+                "Aéreo",
+                "Trânsito",
+                "Outros"
+            ])
+            
+        with col_caso2:
+            assunto_caso = st.selectbox("Assunto do Caso", [
+                "Atraso de Voo",
+                "Cancelamento de Voo",
+                "Overbooking",
+                "Downgrade",
+                "Extravio de Bagagem",
+                "Danos de Bagagem",
+                "Multas",
+                "Lei Seca",
+                "Outros"
+            ])
+            
+        with col_caso3:
+            responsavel_comercial = st.selectbox("Responsável Comercial", [
+                "Bruno",
+                "Poppe",
+                "Motta",
+                "Caval",
+                "Fred",
+                "Mari",
+                "Outro"
+            ])
         
         # Seção: Endereço
         create_form_section("Endereço")
@@ -192,4 +227,4 @@ def main():
 if __name__ == "__main__":
     if not check_authentication(init_managers()[0].supabase):
         st.stop()
-    main() 
+    render_onboarding() 
