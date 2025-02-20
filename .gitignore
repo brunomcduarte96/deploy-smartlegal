@@ -23,14 +23,42 @@ var/
 # Virtual Environment
 venv/
 ENV/
+.env
+.venv
+env.bak/
+venv.bak/
 
 # Streamlit
 .streamlit/secrets.toml
+.streamlit/secrets.local.toml
+.streamlit/.temp/
 
 # IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+.DS_Store
 
 # Misc
 .DS_Store
-*.log 
+*.log
+temp/
+tmp/
+.cache/
+*.bak
+*.tmp
+
+# Local development files
+local_settings.py
+dev_settings.py
+*.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Google credentials
+*credentials*.json
+token*.json
+*service-account*.json 
