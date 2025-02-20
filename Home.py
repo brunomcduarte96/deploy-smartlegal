@@ -85,26 +85,31 @@ def render_home():
     # Primeira linha de botões
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Clientes Smart Legal", use_container_width=True):
-            webbrowser.open_new_tab(URLS["CLIENTES_SMARTLEGAL"])
+        st.link_button("Clientes Smart Legal", 
+                      URLS["CLIENTES_SMARTLEGAL"],
+                      use_container_width=True)
     with col2:
-        if st.button("Processos Em Andamento", use_container_width=True):
-            webbrowser.open_new_tab(URLS["PROCESSOS_ANDAMENTO"])
+        st.link_button("Processos Em Andamento", 
+                      URLS["PROCESSOS_ANDAMENTO"],
+                      use_container_width=True)
     
     # Segunda linha de botões
     col3, col4 = st.columns(2)
     with col3:
-        if st.button("Leads Ads", use_container_width=True):
-            webbrowser.open_new_tab(URLS["LEADS_ADS"])
+        st.link_button("Leads Ads", 
+                      URLS["LEADS_ADS"],
+                      use_container_width=True)
     with col4:
-        if st.button("CRM RD Station", use_container_width=True):
-            webbrowser.open_new_tab(URLS["CRM_RD"])
+        st.link_button("CRM RD Station", 
+                      URLS["CRM_RD"],
+                      use_container_width=True)
     
     # Terceira linha com um botão centralizado
     col5, _ = st.columns(2)
     with col5:
-        if st.button("Drive Gmail", use_container_width=True):
-            webbrowser.open_new_tab(URLS["DRIVE_GMAIL"])
+        st.link_button("Drive Gmail", 
+                      URLS["DRIVE_GMAIL"],
+                      use_container_width=True)
     
     # Seções existentes
     st.markdown("---")
