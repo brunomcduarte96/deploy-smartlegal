@@ -21,6 +21,11 @@ import re
 import os
 from pathlib import Path
 import logging
+from unidecode import unidecode
+import pytz
+
+# Configurar timezone de São Paulo
+SP_TZ = pytz.timezone('America/Sao_Paulo')
 
 logger = logging.getLogger(__name__)
 
@@ -232,69 +237,156 @@ class GoogleManager:
         except Exception as e:
             raise Exception(f"Erro ao exportar para PDF: {str(e)}")
 
-    def update_sheets_with_client_data(self, client_data: Dict[str, Any], folder_url: str):
-        """Atualiza as duas planilhas com os dados do cliente"""
+    def update_sheets_with_client_data(self, client_data: Dict[str, Any], folder_url: str, caso_data: Dict[str, Any], is_new_client: bool = False):
+        """
+        Atualiza as duas planilhas com os dados do cliente e do caso
+        
+        Args:
+            client_data: Dados do cliente
+            folder_url: URL da pasta do cliente
+            caso_data: Dados do caso
+            is_new_client: Se True, adiciona cliente na primeira planilha
+        """
         try:
-            # Formata a data de nascimento
-            data_nascimento = datetime.fromisoformat(client_data['data_nascimento'])
-            data_nascimento_formatada = data_nascimento.strftime('%d/%m/%Y')
+            # Atualiza primeira planilha apenas se for cliente novo
+            if is_new_client:
+                # Formata a data de nascimento
+                data_nascimento = datetime.fromisoformat(client_data['data_nascimento'])
+                data_nascimento_formatada = data_nascimento.strftime('%d/%m/%Y')
+                
+                # Atualiza primeira planilha (dados pessoais do cliente)
+                values1 = [[
+                    client_data['nome_completo'],
+                    client_data['nacionalidade'],
+                    client_data['estado_civil'],
+                    client_data['profissao'],
+                    client_data['email'],
+                    client_data['celular'],
+                    data_nascimento_formatada,
+                    client_data['rg'],
+                    client_data['cpf'],
+                    client_data['endereco'],
+                    client_data['bairro'],
+                    client_data['cidade'],
+                    client_data['estado'],
+                    client_data['cep'],
+                    folder_url  # URL da pasta do cliente
+                ]]
+                
+                # Append direto na primeira planilha
+                self.sheets_service.spreadsheets().values().append(
+                    spreadsheetId=SHEET_ID_1,
+                    range='A:O',
+                    valueInputOption='USER_ENTERED',
+                    insertDataOption='INSERT_ROWS',
+                    body={'values': values1}
+                ).execute()
+                logger.info(f"Planilha 1 atualizada com dados de {client_data['nome_completo']}")
             
-            # Atualiza primeira planilha (todos os dados)
-            values1 = [[
-                client_data['nome_completo'],
-                client_data['nacionalidade'],
-                client_data['estado_civil'],
-                client_data['profissao'],
-                client_data['email'],
-                client_data['celular'],
-                data_nascimento_formatada,  # Data formatada
-                client_data['rg'],
-                client_data['cpf'],
-                client_data['caso'],
-                client_data['assunto_caso'],
-                client_data['responsavel_comercial'],
-                client_data['endereco'],
-                client_data['bairro'],
-                client_data['cidade'],
-                client_data['estado'],
-                client_data['cep'],
-                folder_url
-            ]]
-            
-            # Append direto na primeira planilha
-            self.sheets_service.spreadsheets().values().append(
-                spreadsheetId=SHEET_ID_1,
-                range='A:R',  # Ajustado para incluir a coluna do link
-                valueInputOption='USER_ENTERED',
-                insertDataOption='INSERT_ROWS',
-                body={'values': values1}
-            ).execute()
-            logger.info(f"Planilha 1 atualizada com dados de {client_data['nome_completo']}")
-            
-            # Atualiza segunda planilha (dados específicos)
-            current_date = datetime.now().strftime('%d/%m/%Y')
+            # Sempre atualiza a segunda planilha com o novo caso
+            current_date = datetime.now(SP_TZ).strftime('%d/%m/%Y')
             values2 = [[
                 client_data['nome_completo'],      # A: Cliente
                 current_date,                      # B: Data Entrada
-                client_data['responsavel_comercial'], # C: Responsavel Comercial
-                client_data['caso'],              # D: Caso
-                client_data['assunto_caso'],      # E: Assunto Caso
+                caso_data['responsavel_comercial'], # C: Responsavel Comercial
+                caso_data['caso'],                # D: Caso
+                caso_data['assunto_caso'],        # E: Assunto Caso
                 "",                               # F: Quem está fazendo (vazio)
                 "Em andamento",                   # G: Status
                 "",                               # H: Data Audiencia (vazio)
-                folder_url                        # I: Pasta Drive
+                caso_data['pasta_caso_url']       # I: Pasta Drive (agora é a pasta do caso)
             ]]
             
             # Append direto na segunda planilha
             self.sheets_service.spreadsheets().values().append(
                 spreadsheetId=SHEET_ID_2,
-                range='A:I',  # Ajustado para incluir todas as colunas
+                range='A:I',
                 valueInputOption='USER_ENTERED',
                 insertDataOption='INSERT_ROWS',
                 body={'values': values2}
             ).execute()
-            logger.info(f"Planilha 2 atualizada com dados de {client_data['nome_completo']}")
+            logger.info(f"Planilha 2 atualizada com caso para {client_data['nome_completo']}")
             
         except Exception as e:
             logger.error(f"Erro ao atualizar planilhas: {str(e)}")
-            raise Exception(f"Erro ao atualizar planilhas: {str(e)}") 
+            raise Exception(f"Erro ao atualizar planilhas: {str(e)}")
+
+    def format_folder_name(self, text: str) -> str:
+        """Formata nome da pasta removendo caracteres especiais e espaços"""
+        text = text.strip()
+        text = unidecode(text)
+        text = text.replace(' ', '_')
+        return text
+
+    def get_or_create_client_folder(self, nome: str, cpf: str) -> str:
+        """
+        Busca ou cria pasta do cliente no formato NOME_CPF
+        Retorna: ID da pasta do cliente
+        """
+        try:
+            nome_formatado = self.format_folder_name(nome)
+            cpf_formatado = cpf.replace('.', '').replace('-', '')
+            folder_name = f"{nome_formatado}_{cpf_formatado}"
+            
+            # Verifica se pasta já existe
+            response = self.drive_service.files().list(
+                q=f"name='{folder_name}' and '{ROOT_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder'",
+                spaces='drive'
+            ).execute()
+            
+            if response.get('files'):
+                logger.info(f"Pasta do cliente encontrada: {folder_name}")
+                return response['files'][0]['id']
+            
+            # Cria nova pasta
+            folder_metadata = {
+                'name': folder_name,
+                'mimeType': 'application/vnd.google-apps.folder',
+                'parents': [ROOT_FOLDER_ID]
+            }
+            folder = self.drive_service.files().create(
+                body=folder_metadata,
+                fields='id'
+            ).execute()
+            
+            logger.info(f"Pasta do cliente criada: {folder_name}")
+            return folder.get('id')
+            
+        except Exception as e:
+            raise DriveError(f"Erro ao criar/buscar pasta do cliente: {str(e)}")
+
+    def create_case_folder(self, client_folder_id: str, assunto_caso: str) -> str:
+        """
+        Cria pasta do caso no formato ASSUNTO_CASO_DATA
+        Retorna: ID da pasta do caso
+        """
+        try:
+            assunto_formatado = self.format_folder_name(assunto_caso)
+            data_atual = datetime.now(SP_TZ).strftime('%Y%m%d')
+            folder_name = f"{assunto_formatado}_{data_atual}"
+            
+            folder_metadata = {
+                'name': folder_name,
+                'mimeType': 'application/vnd.google-apps.folder',
+                'parents': [client_folder_id]
+            }
+            
+            folder = self.drive_service.files().create(
+                body=folder_metadata,
+                fields='id'
+            ).execute()
+            
+            logger.info(f"Pasta do caso criada: {folder_name}")
+            return folder.get('id')
+            
+        except Exception as e:
+            raise DriveError(f"Erro ao criar pasta do caso: {str(e)}")
+
+    def get_folder_url(self, folder_id: str) -> str:
+        """Retorna URL da pasta do Drive"""
+        try:
+            # Verifica se a pasta existe
+            self.drive_service.files().get(fileId=folder_id).execute()
+            return f"https://drive.google.com/drive/folders/{folder_id}"
+        except Exception as e:
+            raise DriveError(f"Erro ao gerar URL da pasta: {str(e)}") 

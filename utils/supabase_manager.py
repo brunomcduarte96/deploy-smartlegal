@@ -2,6 +2,9 @@ from supabase import create_client, Client
 from config.settings import SUPABASE_URL, SUPABASE_KEY
 from typing import Dict, Any, List, Optional
 import streamlit as st
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SupabaseManager:
     def __init__(self):
@@ -19,15 +22,57 @@ class SupabaseManager:
             raise Exception(f"Erro ao verificar email: {str(e)}")
     
     def insert_client_data(self, table: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Insere dados do cliente na tabela especificada"""
+        """Insere dados na tabela especificada"""
         try:
-            # Verifica se o email já existe
-            if self.check_email_exists(data['email']):
-                raise Exception("Email já cadastrado no sistema")
+            # Log dos dados que estão sendo inseridos
+            logger.info(f"Tentando inserir dados na tabela {table}: {data}")
+            
+            # Verifica se é a tabela de clientes
+            if table == 'clientes':
+                # Verifica se o email já existe
+                if self.check_email_exists(data['email']):
+                    raise Exception("Email já cadastrado no sistema")
                 
-            response = self.supabase.table(table).insert(data).execute()
-            return response.data[0]
+                # Verifica campos obrigatórios para clientes
+                required_fields = ['nome_completo', 'email', 'cpf']
+                for field in required_fields:
+                    if not data.get(field):
+                        raise Exception(f"Campo obrigatório não preenchido: {field}")
+            
+            # Verifica se é a tabela de casos
+            elif table == 'casos':
+                # Verifica campos obrigatórios para casos
+                required_fields = ['cliente_id', 'nome_cliente', 'caso', 'assunto_caso', 'responsavel_comercial']
+                for field in required_fields:
+                    if not data.get(field):
+                        raise Exception(f"Campo obrigatório não preenchido: {field}")
+            
+            # Tenta inserir os dados
+            try:
+                response = self.supabase.table(table)\
+                    .insert(data)\
+                    .execute()
+                
+                if not response.data or len(response.data) == 0:
+                    raise Exception("Nenhum dado retornado após inserção")
+                    
+                logger.info(f"Dados inseridos com sucesso na tabela {table}")
+                return response.data[0]
+                
+            except Exception as e:
+                # Tenta obter mais detalhes do erro
+                error_details = str(e)
+                if hasattr(e, 'code'):
+                    error_details += f" (Code: {e.code})"
+                if hasattr(e, 'details'):
+                    error_details += f" (Details: {e.details})"
+                    
+                logger.error(f"Erro na inserção no Supabase: {error_details}")
+                raise Exception(f"Erro na inserção: {error_details}")
+                
         except Exception as e:
+            logger.error(f"Erro ao inserir dados na tabela {table}: {str(e)}")
+            logger.error(f"Dados que tentaram ser inseridos: {data}")
             raise Exception(f"Erro ao inserir dados: {str(e)}")
     
     def update_client_data(self, table: str, id: int, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -139,6 +184,14 @@ class SupabaseManager:
             return response.data[0] if response.data else None
         except Exception as e:
             raise Exception(f"Erro ao buscar cliente por email: {str(e)}")
+
+    def check_table_exists(self, table: str) -> bool:
+        """Verifica se a tabela existe"""
+        try:
+            response = self.supabase.table(table).select('count').limit(1).execute()
+            return True
+        except Exception:
+            return False
 
 def init_supabase() -> Client:
     """Inicializa o cliente Supabase"""

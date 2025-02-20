@@ -1,119 +1,78 @@
 import streamlit as st
-from utils.auth_manager import check_authentication, logout
-from utils.supabase_manager import init_supabase
-import webbrowser
-from config.settings import URLS
 from sections.onboarding import render_onboarding
+from sections.atraso_voo import render_atraso_voo
+from utils.auth_manager import check_authentication, handle_logout
+import os
 
-st.set_page_config(
-    page_title="SmartLegal - Sistema Jurídico",
-    page_icon="⚖️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-
-def main():
-    # Inicialização do Supabase
-    supabase = init_supabase()
+def render_sidebar():
+    """Renderiza a barra lateral com a estrutura definida"""
+    # Logo
+    logo_path = os.path.join("assets", "logo.png")
+    if os.path.exists(logo_path):
+        st.sidebar.image(logo_path, width=200)
     
-    # Sidebar
-    with st.sidebar:
-        # Logo no topo
-        st.image("logo.png", width=200)
-        
-        # Seção Smart Legal
-        st.title("Smart Legal")
-        if st.button("Home", use_container_width=True):
-            st.session_state.page = "home"
-        if st.button("Onboarding", use_container_width=True):
-            st.session_state.page = "onboarding"
-        
-        # Criar espaço para empurrar o logout para baixo
-        st.markdown("""
-            <style>
-                div[data-testid="stVerticalBlock"] div[style*="flex-direction: column;"] div[data-testid="stVerticalBlock"] {
-                    gap: 0rem;
-                }
-                div[data-testid="stSidebarUserContent"] {
-                    height: calc(100vh - 100px);
-                    display: flex;
-                    flex-direction: column;
-                }
-                .logout-container {
-                    margin-top: auto;
-                    padding-bottom: 1rem;
-                }
-                [data-testid="stImage"] {
-                    margin-bottom: 1rem;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-        
-        # Container para logout e informações do usuário
-        with st.container():
-            st.markdown('<div class="logout-container">', unsafe_allow_html=True)
-            if st.session_state.get('authenticated'):
-                st.markdown("---")
-                st.write("Usuário:", st.session_state.user.email)
-                if st.button("Logout", use_container_width=True):
-                    logout()
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    # Verificação de autenticação
-    if not check_authentication(supabase):
-        st.warning("Por favor, faça login para continuar.")
-        return
+    st.sidebar.divider()  # Separador
     
-    # Renderizar página selecionada
-    if not hasattr(st.session_state, 'page'):
-        st.session_state.page = "home"
+    # Botão Home
+    if st.sidebar.button("Home", use_container_width=True):
+        st.session_state.current_page = "home"
+        st.rerun()
         
-    if st.session_state.page == "home":
-        render_home()
-    elif st.session_state.page == "onboarding":
-        render_onboarding()
+    st.sidebar.divider()  # Separador
+    
+    # Seção Comercial
+    st.sidebar.markdown("#### Comercial")
+    if st.sidebar.button("Onboarding", use_container_width=True):
+        st.session_state.current_page = "onboarding"
+        st.rerun()
+        
+    st.sidebar.divider()  # Separador
+    
+    # Seção Jurídico
+    st.sidebar.markdown("#### Jurídico")
+    if st.sidebar.button("Atraso / Cancelamento de Voo", use_container_width=True):
+        st.session_state.current_page = "atraso_voo"
+        st.rerun()
+    
+    st.sidebar.divider()  # Separador
+    
+    # Seção do Usuário
+    email = st.session_state.get('email', '')
+    st.sidebar.markdown("#### Usuário")
+    st.sidebar.text(email)
+    if st.sidebar.button("Logout", use_container_width=True):
+        handle_logout()
+        st.rerun()
 
 def render_home():
-    # Conteúdo principal - Menu
-    st.title("Menu Principal")
-    
-    # Links Rápidos
-    st.header("Links Rápidos")
-    
-    # Primeira linha de botões
-    col1, col2 = st.columns(2)
-    with col1:
-        st.link_button("Clientes Smart Legal", 
-                      URLS["CLIENTES_SMARTLEGAL"],
-                      use_container_width=True)
-    with col2:
-        st.link_button("Processos Em Andamento", 
-                      URLS["PROCESSOS_ANDAMENTO"],
-                      use_container_width=True)
-    
-    # Segunda linha de botões
-    col3, col4 = st.columns(2)
-    with col3:
-        st.link_button("Leads Ads", 
-                      URLS["LEADS_ADS"],
-                      use_container_width=True)
-    with col4:
-        st.link_button("CRM RD Station", 
-                      URLS["CRM_RD"],
-                      use_container_width=True)
-    
-    # Terceira linha com um botão centralizado
-    col5, _ = st.columns(2)
-    with col5:
-        st.link_button("Drive Gmail", 
-                      URLS["DRIVE_GMAIL"],
-                      use_container_width=True)
-    
-    # Seções existentes
-    st.markdown("---")
+    """Renderiza a página inicial"""
+    st.title("Smart Legal")
+    st.write("Bem-vindo ao sistema de gestão Smart Legal")
 
+def main():
+    # Verifica autenticação
+    if not check_authentication():
+        st.stop()
+    
+    # Inicializa o estado da página se necessário
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "home"
+    
+    # Renderiza a barra lateral
+    render_sidebar()
+    
+    # Renderiza a página atual
+    if st.session_state.current_page == "home":
+        render_home()
+    elif st.session_state.current_page == "onboarding":
+        render_onboarding()
+    elif st.session_state.current_page == "atraso_voo":
+        render_atraso_voo()
 
 if __name__ == "__main__":
+    st.set_page_config(
+        page_title="Smart Legal",
+        page_icon="⚖️",
+        layout="wide"
+    )
     main() 

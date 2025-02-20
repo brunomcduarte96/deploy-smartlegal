@@ -42,30 +42,37 @@ def create_form_section(title: str):
 def handle_file_upload(file, folder_id: str, google_manager: GoogleManager):
     """Processa o upload de arquivo, convertendo para PDF se necessário"""
     if file is not None:
-        file_content = file.read()
-        file_type = file.name.split('.')[-1].lower()
-        
-        # Verifica se é PDF ou precisa converter
-        if not PDFManager.check_pdf(file_content):
-            try:
-                file_content = PDFManager.convert_to_pdf(file_content, file_type)
-            except Exception as e:
-                st.error(f"Erro ao converter arquivo para PDF: {str(e)}")
-                return None
-        
-        # Upload para o Google Drive com timestamp SP
         try:
+            file_content = file.read()
+            file_type = file.name.split('.')[-1].lower()
+            
+            # Se já é PDF, não precisa converter
+            if file_type == 'pdf':
+                mime_type = 'application/pdf'
+                final_content = file_content
+            else:
+                # Converte para PDF se não for PDF
+                mime_type = 'application/pdf'
+                final_content = PDFManager.convert_to_pdf(file_content, file_type)
+            
+            # Upload para o Google Drive com timestamp SP
             sp_timestamp = get_sp_datetime().strftime('%Y%m%d_%H%M%S')
-            file_name = f"{sp_timestamp}_{file.name}.pdf"
+            file_name = f"{sp_timestamp}_{file.name}"
+            if not file_name.lower().endswith('.pdf'):
+                file_name = f"{file_name}.pdf"
+                
             file_id = google_manager.upload_file(
                 file_name=file_name,
-                file_content=file_content,
-                mime_type='application/pdf',
+                file_content=final_content,
+                mime_type=mime_type,
                 folder_id=folder_id
             )
+            logger.info(f"Arquivo {file_name} enviado com sucesso")
             return file_id
+            
         except Exception as e:
-            st.error(f"Erro ao fazer upload do arquivo: {str(e)}")
+            logger.error(f"Erro ao processar arquivo {file.name}: {str(e)}")
+            st.error(f"Erro ao processar arquivo {file.name}")
             return None
     return None
 
@@ -75,7 +82,220 @@ def render_onboarding():
     # Inicialização dos gerenciadores
     supabase_manager, google_manager = init_managers()
     
-    # Formulário principal
+    # Controle de estado para mostrar formulário completo
+    if 'show_full_form' not in st.session_state:
+        st.session_state.show_full_form = False
+    
+    # Se não estiver mostrando o formulário completo, mostra a busca
+    if not st.session_state.show_full_form:
+        # Seção de busca de cliente
+        st.header("Verificar Cliente Existente")
+        
+        # Campo de busca com autocomplete
+        search_name = st.text_input("Digite o nome do cliente")
+        
+        if search_name:
+            # Buscar sugestões de clientes
+            suggestions = supabase_manager.search_clients_by_partial_name(search_name)
+            
+            if suggestions:
+                # Criar lista de opções para o selectbox
+                options = ["Selecione um cliente..."] + [
+                    f"{cliente['nome_completo']} - CPF: {cliente['cpf']}" 
+                    for cliente in suggestions
+                ]
+                
+                selected_option = st.selectbox(
+                    "Clientes encontrados:",
+                    options
+                )
+                
+                # Se um cliente foi selecionado
+                if selected_option != "Selecione um cliente...":
+                    # Encontrar o cliente selecionado
+                    nome_selecionado = selected_option.split(" - CPF:")[0]
+                    cliente = supabase_manager.get_client_by_name(nome_selecionado)
+                    
+                    if cliente:
+                        st.success(f"Cliente selecionado: {cliente['nome_completo']}")
+                        
+                        # Mostrar dados do cliente (não editáveis)
+                        with st.expander("Dados do Cliente", expanded=True):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.text_input("Nome Completo", value=cliente['nome_completo'], disabled=True)
+                                st.text_input("Email", value=cliente['email'], disabled=True)
+                                st.text_input("CPF", value=cliente['cpf'], disabled=True)
+                            with col2:
+                                st.text_input("Telefone", value=cliente['celular'], disabled=True)
+                                st.text_input("Endereço", value=cliente['endereco'], disabled=True)
+                        
+                        # Formulário apenas para o caso
+                        with st.form("caso_form"):
+                            st.header("Novo Caso")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                caso = st.selectbox("Caso", [
+                                    "Aéreo",
+                                    "Trânsito",
+                                    "Outros"
+                                ])
+                            with col2:
+                                assunto_caso = st.selectbox("Assunto do Caso", [
+                                    "Atraso de Voo",
+                                    "Cancelamento de Voo",
+                                    "Overbooking",
+                                    "Downgrade",
+                                    "Extravio de Bagagem",
+                                    "Danos de Bagagem",
+                                    "Multas",
+                                    "Lei Seca",
+                                    "Outros"
+                                ])
+                            with col3:
+                                responsavel_comercial = st.selectbox("Responsável Comercial", [
+                                    "Bruno",
+                                    "Poppe",
+                                    "Motta",
+                                    "Caval",
+                                    "Fred",
+                                    "Mari",
+                                    "Outro"
+                                ])
+                            
+                            # Documentos
+                            st.header("Documentos do Caso")
+                            doc_identidade = st.file_uploader("Documento de Identidade", type=['pdf', 'png', 'jpg', 'jpeg'])
+                            doc_residencia = st.file_uploader("Comprovante de Residência", type=['pdf', 'png', 'jpg', 'jpeg'])
+                            outros_docs = st.file_uploader("Outros Documentos", type=['pdf', 'png', 'jpg', 'jpeg'], accept_multiple_files=True)
+                            
+                            submitted = st.form_submit_button("Cadastrar Novo Caso")
+                            
+                            if submitted:
+                                try:
+                                    # Criar barra de progresso
+                                    progress_bar = st.progress(0)
+                                    status_text = st.empty()
+
+                                    # 1. Criando pasta do caso (20%)
+                                    status_text.text("Criando pasta do caso...")
+                                    progress_bar.progress(20)
+                                    
+                                    client_folder_id = cliente['pasta_drive_id']
+                                    case_folder_id = google_manager.create_case_folder(client_folder_id, assunto_caso)
+                                    
+                                    # 2. Salvando dados do caso (40%)
+                                    status_text.text("Salvando dados do caso...")
+                                    progress_bar.progress(40)
+                                    
+                                    case_data = {
+                                        'cliente_id': cliente['id'],
+                                        'nome_cliente': cliente['nome_completo'],
+                                        'caso': caso,
+                                        'assunto_caso': assunto_caso,
+                                        'responsavel_comercial': responsavel_comercial,
+                                        'pasta_caso_id': case_folder_id,
+                                        'pasta_caso_url': google_manager.get_folder_url(case_folder_id),
+                                        'created_at': get_sp_datetime().isoformat()
+                                    }
+                                    
+                                    # Salvar caso
+                                    supabase_manager.insert_client_data('casos', case_data)
+                                    
+                                    # 3. Upload de documentos (60%)
+                                    status_text.text("Fazendo upload dos documentos...")
+                                    progress_bar.progress(60)
+                                    
+                                    # Upload documentos com tratamento de erro individual
+                                    if doc_identidade:
+                                        try:
+                                            handle_file_upload(doc_identidade, case_folder_id, google_manager)
+                                        except Exception as e:
+                                            logger.error(f"Erro ao processar {doc_identidade.name}: {str(e)}")
+                                            st.warning(f"Erro ao processar {doc_identidade.name}")
+
+                                    if doc_residencia:
+                                        try:
+                                            handle_file_upload(doc_residencia, case_folder_id, google_manager)
+                                        except Exception as e:
+                                            logger.error(f"Erro ao processar {doc_residencia.name}: {str(e)}")
+                                            st.warning(f"Erro ao processar {doc_residencia.name}")
+
+                                    for doc in outros_docs:
+                                        try:
+                                            handle_file_upload(doc, case_folder_id, google_manager)
+                                        except Exception as e:
+                                            logger.error(f"Erro ao processar {doc.name}: {str(e)}")
+                                            st.warning(f"Erro ao processar {doc.name}")
+                                    
+                                    # 4. Gerando procuração (80%)
+                                    status_text.text("Gerando procuração...")
+                                    progress_bar.progress(80)
+                                    
+                                    # Prepara dados para o template
+                                    template_data = {
+                                        'nome_completo': cliente['nome_completo'],
+                                        'nacionalidade': cliente['nacionalidade'],
+                                        'estado_civil': cliente['estado_civil'],
+                                        'profissao': cliente['profissao'],
+                                        'rg': cliente['rg'],
+                                        'cpf': cliente['cpf'],
+                                        'endereco': cliente['endereco'],
+                                        'bairro': cliente['bairro'],
+                                        'cep': cliente['cep'],
+                                        'cidade': cliente['cidade'],
+                                        'estado': cliente['estado'],
+                                        'data_extenso': data_por_extenso(get_sp_datetime())
+                                    }
+
+                                    # Gera os documentos
+                                    pdf_id, docx_id = google_manager.fill_document_template(
+                                        "Modelo Procuracao JEC.docx",
+                                        template_data,
+                                        case_folder_id
+                                    )
+                                    
+                                    # 5. Atualizando planilhas (90%)
+                                    status_text.text("Atualizando planilhas...")
+                                    progress_bar.progress(90)
+                                    
+                                    # Atualizar planilhas
+                                    google_manager.update_sheets_with_client_data(
+                                        client_data=cliente,
+                                        folder_url=google_manager.get_folder_url(client_folder_id),
+                                        caso_data=case_data,
+                                        is_new_client=False
+                                    )
+                                    
+                                    # 6. Finalização (100%)
+                                    progress_bar.progress(100)
+                                    status_text.text("Concluído!")
+                                    st.success("Novo caso cadastrado com sucesso!")
+                                    
+                                except Exception as e:
+                                    handle_error(e)
+                                    st.stop()
+            
+            else:
+                st.warning("Nenhum cliente encontrado com esse nome.")
+                if st.button("Cadastrar Novo Cliente"):
+                    st.session_state.show_full_form = True
+                    st.rerun()
+        
+        else:
+            st.info("👆 Digite o nome do cliente para verificar se já existe cadastro.")
+    
+    # Se estiver mostrando o formulário completo
+    else:
+        if st.button("← Voltar à Busca"):
+            st.session_state.show_full_form = False
+            st.rerun()
+        else:
+            render_full_form(supabase_manager, google_manager)
+
+def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleManager):
+    """Renderiza o formulário completo de cadastro de cliente"""
     with st.form("onboarding_form"):
         # Seção: Dados do Cliente
         create_form_section("Dados do Cliente")
@@ -147,18 +367,22 @@ def render_onboarding():
         
         # Seção: Documentos
         create_form_section("Documentos")
-        doc_identidade = st.file_uploader("Documento de Identidade", 
-            type=['pdf', 'png', 'jpg', 'jpeg', 'docx'])
-        doc_residencia = st.file_uploader("Comprovante de Residência", 
-            type=['pdf', 'png', 'jpg', 'jpeg', 'docx'])
-        outros_docs = st.file_uploader("Outros Comprovantes", 
-            type=['pdf', 'png', 'jpg', 'jpeg', 'docx'], accept_multiple_files=True)
+        doc_identidade = st.file_uploader("Documento de Identidade", type=['pdf', 'png', 'jpg', 'jpeg'])
+        doc_residencia = st.file_uploader("Comprovante de Residência", type=['pdf', 'png', 'jpg', 'jpeg'])
+        outros_docs = st.file_uploader("Outros Documentos", type=['pdf', 'png', 'jpg', 'jpeg'], accept_multiple_files=True)
         
-        # Botão de submissão
         submitted = st.form_submit_button("Cadastrar")
         
         if submitted:
             try:
+                # Criar barra de progresso
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+
+                # 1. Formatação e preparação dos dados (10%)
+                status_text.text("Preparando dados...")
+                progress_bar.progress(10)
+                
                 # Formata os dados
                 nome_completo = format_title_case(nome_completo)
                 nacionalidade = format_title_case(nacionalidade)
@@ -166,42 +390,19 @@ def render_onboarding():
                 bairro = format_title_case(bairro)
                 cidade = format_title_case(cidade)
                 
-                # Validar email antes de prosseguir
-                if supabase_manager.check_email_exists(email):
-                    st.warning("Este email já está cadastrado no sistema.")
-                    
-                    # Busca dados do cliente existente
-                    cliente_existente = supabase_manager.get_client_by_email(email)
-                    if cliente_existente:
-                        folder_url = f"https://drive.google.com/drive/folders/{cliente_existente['pasta_drive_id']}"
-                        st.info(f"Acesse a pasta do cliente: [Clique aqui]({folder_url})")
-                    
-                    st.stop()
-                
-                # Criar barra de progresso
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                # 1. Criar pasta no Drive
-                status_text.text("Criando pasta no Google Drive...")
-                progress_bar.progress(10)
                 sp_now = get_sp_datetime()
-                folder_name = f"{nome_completo}_{sp_now.strftime('%Y%m%d_%H%M%S')}"
-                folder_id = google_manager.create_folder(folder_name)
                 
-                # 2. Upload de documentos
-                status_text.text("Fazendo upload dos documentos...")
+                # 2. Criação da estrutura no Drive (30%)
+                status_text.text("Criando estrutura de pastas...")
                 progress_bar.progress(30)
-                doc_ids = {
-                    'identidade': handle_file_upload(doc_identidade, folder_id, google_manager),
-                    'residencia': handle_file_upload(doc_residencia, folder_id, google_manager),
-                    'outros': [handle_file_upload(doc, folder_id, google_manager) 
-                             for doc in outros_docs if doc is not None]
-                }
                 
-                # 3. Salvando no banco
-                status_text.text("Salvando informações...")
-                progress_bar.progress(60)
+                # Criar/buscar pasta do cliente
+                client_folder_id = google_manager.get_or_create_client_folder(nome_completo, cpf)
+                
+                # 3. Salvando cliente no Supabase (50%)
+                status_text.text("Salvando dados do cliente...")
+                progress_bar.progress(50)
+                
                 client_data = {
                     'nome_completo': nome_completo,
                     'nacionalidade': nacionalidade,
@@ -209,25 +410,58 @@ def render_onboarding():
                     'profissao': profissao,
                     'email': email,
                     'celular': celular,
-                    'data_nascimento': data_nascimento.isoformat(),  # A data de nascimento não precisa de timezone
+                    'data_nascimento': data_nascimento.isoformat(),
                     'rg': rg,
                     'cpf': cpf,
-                    'caso': caso,
-                    'assunto_caso': assunto_caso,
-                    'responsavel_comercial': responsavel_comercial,
                     'endereco': endereco,
                     'bairro': bairro,
                     'cidade': cidade,
                     'estado': estado,
                     'cep': cep,
-                    'pasta_drive_id': folder_id,
-                    'documentos': doc_ids,
-                    'created_at': sp_now.isoformat()  # Adiciona timestamp SP
+                    'pasta_drive_id': client_folder_id,
+                    'created_at': sp_now.isoformat()
                 }
-                supabase_manager.insert_client_data('clientes', client_data)
+
+                # Salvar cliente no Supabase
+                client_response = supabase_manager.insert_client_data('clientes', client_data)
+                client_id = client_response['id']
+
+                # 4. Criando caso (70%)
+                status_text.text("Criando novo caso...")
+                progress_bar.progress(70)
                 
-                # 4. Gerando documentos
-                status_text.text("Gerando documentos...")
+                # Criar pasta do caso
+                case_folder_id = google_manager.create_case_folder(client_folder_id, assunto_caso)
+
+                # Preparar dados do caso
+                case_data = {
+                    'cliente_id': client_id,
+                    'nome_cliente': nome_completo,
+                    'caso': caso,
+                    'assunto_caso': assunto_caso,
+                    'responsavel_comercial': responsavel_comercial,
+                    'pasta_caso_id': case_folder_id,
+                    'pasta_caso_url': google_manager.get_folder_url(case_folder_id),
+                    'created_at': sp_now.isoformat()
+                }
+
+                # Salvar caso no Supabase
+                supabase_manager.insert_client_data('casos', case_data)
+
+                # 5. Upload de documentos (80%)
+                status_text.text("Fazendo upload dos documentos...")
+                progress_bar.progress(80)
+                
+                # Upload dos documentos na pasta do caso
+                doc_ids = {
+                    'identidade': handle_file_upload(doc_identidade, case_folder_id, google_manager),
+                    'residencia': handle_file_upload(doc_residencia, case_folder_id, google_manager),
+                    'outros': [handle_file_upload(doc, case_folder_id, google_manager) 
+                             for doc in outros_docs if doc is not None]
+                }
+                
+                # 6. Gerando procuração (90%)
+                status_text.text("Gerando procuração...")
                 progress_bar.progress(90)
                 
                 # Prepara dados para o template
@@ -245,23 +479,30 @@ def render_onboarding():
                     'estado': estado,
                     'data_extenso': data_por_extenso(sp_now)
                 }
-                
+
                 # Gera os documentos
                 pdf_id, docx_id = google_manager.fill_document_template(
                     "Modelo Procuracao JEC.docx",
                     template_data,
-                    folder_id
+                    case_folder_id  # Salva na pasta do caso
                 )
                 
-                # Obtém URL da pasta
-                folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+                # 7. Atualizando planilhas (95%)
+                status_text.text("Atualizando planilhas...")
+                progress_bar.progress(95)
                 
-                # Atualiza planilhas
-                google_manager.update_sheets_with_client_data(client_data, folder_url)
+                # Atualizar planilhas
+                google_manager.update_sheets_with_client_data(
+                    client_data=client_data,
+                    folder_url=google_manager.get_folder_url(client_folder_id),
+                    caso_data=case_data,
+                    is_new_client=True
+                )
                 
+                # 8. Finalização (100%)
                 progress_bar.progress(100)
                 status_text.text("Concluído!")
-                st.success("Cliente cadastrado com sucesso!")
+                st.success("Cliente e caso cadastrados com sucesso!")
                 
             except Exception as e:
                 handle_error(e)

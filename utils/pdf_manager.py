@@ -4,6 +4,10 @@ from PyPDF2 import PdfReader, PdfWriter
 from pdf2image import convert_from_bytes
 import io
 from docx import Document
+from PIL import Image
+import logging
+
+logger = logging.getLogger(__name__)
 
 class PDFManager:
     @staticmethod
@@ -19,10 +23,10 @@ class PDFManager:
     def convert_to_pdf(file_content: bytes, file_type: str) -> bytes:
         """Converte diferentes tipos de arquivo para PDF"""
         try:
-            if file_type == 'docx':
-                return PDFManager._convert_docx_to_pdf(file_content)
-            elif file_type in ['jpg', 'jpeg', 'png']:
+            if file_type.lower() in ['jpg', 'jpeg', 'png']:
                 return PDFManager._convert_image_to_pdf(file_content)
+            elif file_type == 'docx':
+                return PDFManager._convert_docx_to_pdf(file_content)
             else:
                 raise ValueError(f"Formato não suportado: {file_type}")
         except Exception as e:
@@ -49,25 +53,28 @@ class PDFManager:
 
     @staticmethod
     def _convert_image_to_pdf(image_content: bytes) -> bytes:
-        """Converte imagem para PDF"""
+        """Converte imagem para PDF usando PIL"""
         try:
-            # Converte a imagem para PDF usando pdf2image
-            output = io.BytesIO()
-            images = convert_from_bytes(image_content)
+            # Abrir imagem usando PIL
+            image = Image.open(io.BytesIO(image_content))
             
-            pdf_writer = PdfWriter()
-            for image in images:
-                img_byte_arr = io.BytesIO()
-                image.save(img_byte_arr, format='PDF')
-                img_byte_arr.seek(0)
-                
-                pdf_reader = PdfReader(img_byte_arr)
-                pdf_writer.add_page(pdf_reader.pages[0])
+            # Converter para RGB se necessário
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
             
-            pdf_writer.write(output)
-            return output.getvalue()
+            # Criar buffer para PDF
+            pdf_buffer = io.BytesIO()
+            
+            # Salvar como PDF
+            image.save(pdf_buffer, format='PDF', resolution=100.0)
+            
+            # Retornar conteúdo do PDF
+            pdf_buffer.seek(0)
+            return pdf_buffer.getvalue()
+            
         except Exception as e:
-            raise Exception(f"Erro na conversão de imagem para PDF: {str(e)}")
+            logger.error(f"Erro ao converter imagem para PDF: {str(e)}")
+            raise Exception(f"Erro ao converter imagem para PDF: {str(e)}")
 
     @staticmethod
     def merge_pdfs(pdf_contents: List[bytes]) -> bytes:
