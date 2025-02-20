@@ -17,6 +17,11 @@ from utils.date_utils import data_por_extenso
 from datetime import datetime
 from docx import Document
 import re
+import os
+from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GoogleManager:
     def __init__(self):
@@ -46,16 +51,36 @@ class GoogleManager:
         return build('docs', 'v1', credentials=self.credentials)
 
     def update_sheet(self, sheet_id: str, range_name: str, values: List[List[Any]]):
-        """Atualiza dados em uma planilha do Google Sheets"""
+        """Adiciona dados na última linha da planilha do Google Sheets"""
         try:
-            body = {'values': values}
-            self.sheets_service.spreadsheets().values().update(
+            # Primeiro, encontra a última linha com dados
+            result = self.sheets_service.spreadsheets().values().get(
                 spreadsheetId=sheet_id,
-                range=range_name,
+                range=range_name
+            ).execute()
+            
+            # Pega o número da próxima linha vazia
+            last_row = len(result.get('values', [])) + 1
+            
+            # Ajusta o range para apontar para a próxima linha vazia
+            sheet_name = range_name.split('!')[0] if '!' in range_name else ''
+            column_range = range_name.split(':')[1] if ':' in range_name else 'Q'
+            new_range = f"{sheet_name}A{last_row}:{column_range}{last_row}"
+            
+            # Faz o append dos dados
+            body = {'values': values}
+            self.sheets_service.spreadsheets().values().append(
+                spreadsheetId=sheet_id,
+                range=new_range,
                 valueInputOption='USER_ENTERED',
+                insertDataOption='INSERT_ROWS',
                 body=body
             ).execute()
+            
+            logger.info(f"Dados adicionados na linha {last_row} da planilha {sheet_id}")
+            
         except Exception as e:
+            logger.error(f"Erro ao atualizar planilha: {str(e)}")
             raise Exception(f"Erro ao atualizar planilha: {str(e)}")
 
     def create_folder(self, folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str:
@@ -101,62 +126,96 @@ class GoogleManager:
         Retorna: (pdf_id, docx_id)
         """
         try:
+            # Verifica se o arquivo existe
+            template_full_path = Path(__file__).parent.parent / 'templates' / template_path
+            if not template_full_path.exists():
+                raise DriveError(f"Template não encontrado: {template_full_path}")
+
             # Carrega o template
-            doc = Document(template_path)
+            try:
+                doc = Document(str(template_full_path))
+            except Exception as e:
+                raise DriveError(f"Erro ao carregar template: {str(e)}")
+            
+            # Log dos dados
+            logger.info(f"Dados para substituição: {data}")
             
             # Substitui os placeholders em todo o documento
             for paragraph in doc.paragraphs:
+                original_text = paragraph.text
                 for key, value in data.items():
                     if f"{{{{{key}}}}}" in paragraph.text:
-                        paragraph.text = paragraph.text.replace(f"{{{{{key}}}}}", value)
+                        paragraph.text = paragraph.text.replace(f"{{{{{key}}}}}", str(value))
+                logger.debug(f"Texto original: {original_text}")
+                logger.debug(f"Texto substituído: {paragraph.text}")
             
             # Salva o documento temporariamente
             temp_docx = BytesIO()
-            doc.save(temp_docx)
-            temp_docx.seek(0)
+            try:
+                doc.save(temp_docx)
+                temp_docx.seek(0)
+            except Exception as e:
+                raise DriveError(f"Erro ao salvar documento temporário: {str(e)}")
             
             # Upload do DOCX
-            docx_id = self.upload_file(
-                f'Procuracao_{data["nome_completo"]}.docx',
-                temp_docx.getvalue(),
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                folder_id
-            )
+            try:
+                docx_id = self.upload_file(
+                    f'Procuracao_{data["nome_completo"]}.docx',
+                    temp_docx.getvalue(),
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    folder_id
+                )
+                logger.info(f"DOCX criado com ID: {docx_id}")
+            except Exception as e:
+                raise DriveError(f"Erro ao fazer upload do DOCX: {str(e)}")
             
             # Converte para Google Docs temporariamente para gerar PDF
-            file_metadata = {
-                'name': 'temp_doc',
-                'mimeType': 'application/vnd.google-apps.document',
-                'parents': [folder_id]
-            }
-            
-            media = MediaIoBaseUpload(
-                temp_docx,
-                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                resumable=True
-            )
-            
-            temp_doc = self.drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
-            ).execute()
+            try:
+                file_metadata = {
+                    'name': 'temp_doc',
+                    'mimeType': 'application/vnd.google-apps.document',
+                    'parents': [folder_id]
+                }
+                
+                media = MediaIoBaseUpload(
+                    temp_docx,
+                    mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    resumable=True
+                )
+                
+                temp_doc = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+                logger.info(f"Documento temporário criado com ID: {temp_doc['id']}")
+            except Exception as e:
+                raise DriveError(f"Erro ao criar documento temporário: {str(e)}")
             
             # Exporta como PDF
-            pdf_content = self.export_to_pdf(temp_doc['id'])
-            pdf_id = self.upload_file(
-                f'Procuracao_{data["nome_completo"]}.pdf',
-                pdf_content,
-                'application/pdf',
-                folder_id
-            )
+            try:
+                pdf_content = self.export_to_pdf(temp_doc['id'])
+                pdf_id = self.upload_file(
+                    f'Procuracao_{data["nome_completo"]}.pdf',
+                    pdf_content,
+                    'application/pdf',
+                    folder_id
+                )
+                logger.info(f"PDF criado com ID: {pdf_id}")
+            except Exception as e:
+                raise DriveError(f"Erro ao gerar PDF: {str(e)}")
             
             # Remove o documento temporário
-            self.drive_service.files().delete(fileId=temp_doc['id']).execute()
+            try:
+                self.drive_service.files().delete(fileId=temp_doc['id']).execute()
+                logger.info("Documento temporário removido")
+            except Exception as e:
+                logger.warning(f"Erro ao remover documento temporário: {str(e)}")
             
             return pdf_id, docx_id
             
         except Exception as e:
+            logger.error(f"Erro ao processar template: {str(e)}")
             raise DriveError(f"Erro ao processar template: {str(e)}")
 
     def export_to_pdf(self, doc_id: str) -> bytes:
@@ -179,7 +238,8 @@ class GoogleManager:
                 'caso', 'assunto_caso', 'responsavel_comercial',
                 'endereco', 'bairro', 'cidade', 'estado', 'cep'
             ]]]
-            self.update_sheet(SHEET_ID_1, 'A:Q', values1)
+            self.update_sheet(SHEET_ID_1, 'Dados!A:Q', values1)
+            logger.info(f"Planilha 1 atualizada com dados de {client_data['nome_completo']}")
             
             # Atualiza segunda planilha (dados específicos)
             current_date = datetime.now().strftime('%d/%m/%Y')
@@ -193,7 +253,9 @@ class GoogleManager:
                 client_data['nome_completo'],
                 folder_url
             ]]
-            self.update_sheet(SHEET_ID_2, 'A:H', values2)
+            self.update_sheet(SHEET_ID_2, 'Dados!A:H', values2)
+            logger.info(f"Planilha 2 atualizada com dados de {client_data['nome_completo']}")
             
         except Exception as e:
+            logger.error(f"Erro ao atualizar planilhas: {str(e)}")
             raise Exception(f"Erro ao atualizar planilhas: {str(e)}") 
