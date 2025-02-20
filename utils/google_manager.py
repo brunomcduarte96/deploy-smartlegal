@@ -15,6 +15,8 @@ from config.settings import (
 )
 from utils.date_utils import data_por_extenso
 from datetime import datetime
+from docx import Document
+import re
 
 class GoogleManager:
     def __init__(self):
@@ -100,44 +102,48 @@ class GoogleManager:
         """
         try:
             # Carrega o template
-            with open(template_path, 'rb') as doc:
-                doc_content = doc.read()
+            doc = Document(template_path)
             
-            # Upload do template para o Drive
-            temp_doc_id = self.upload_file(
-                "temp_template.docx",
-                doc_content,
+            # Substitui os placeholders em todo o documento
+            for paragraph in doc.paragraphs:
+                for key, value in data.items():
+                    if f"{{{{{key}}}}}" in paragraph.text:
+                        paragraph.text = paragraph.text.replace(f"{{{{{key}}}}}", value)
+            
+            # Salva o documento temporariamente
+            temp_docx = BytesIO()
+            doc.save(temp_docx)
+            temp_docx.seek(0)
+            
+            # Upload do DOCX
+            docx_id = self.upload_file(
+                f'Procuracao_{data["nome_completo"]}.docx',
+                temp_docx.getvalue(),
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 folder_id
             )
             
-            # Prepara as substituições
-            requests = []
-            for key, value in data.items():
-                requests.append({
-                    'replaceAllText': {
-                        'containsText': {
-                            'text': f'{{{{{key}}}}}',
-                            'matchCase': True
-                        },
-                        'replaceText': value
-                    }
-                })
+            # Converte para Google Docs temporariamente para gerar PDF
+            file_metadata = {
+                'name': 'temp_doc',
+                'mimeType': 'application/vnd.google-apps.document',
+                'parents': [folder_id]
+            }
             
-            # Aplica as substituições
-            self.docs_service.documents().batchUpdate(
-                documentId=temp_doc_id,
-                body={'requests': requests}
+            media = MediaIoBaseUpload(
+                temp_docx,
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                resumable=True
+            )
+            
+            temp_doc = self.drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
             ).execute()
             
-            # Salva como DOCX
-            docx_id = self.drive_service.files().copy(
-                fileId=temp_doc_id,
-                body={'name': f'Procuracao_{data["nome_completo"]}.docx'}
-            ).execute()['id']
-            
             # Exporta como PDF
-            pdf_content = self.export_to_pdf(temp_doc_id)
+            pdf_content = self.export_to_pdf(temp_doc['id'])
             pdf_id = self.upload_file(
                 f'Procuracao_{data["nome_completo"]}.pdf',
                 pdf_content,
@@ -145,8 +151,8 @@ class GoogleManager:
                 folder_id
             )
             
-            # Remove o arquivo temporário
-            self.drive_service.files().delete(fileId=temp_doc_id).execute()
+            # Remove o documento temporário
+            self.drive_service.files().delete(fileId=temp_doc['id']).execute()
             
             return pdf_id, docx_id
             
