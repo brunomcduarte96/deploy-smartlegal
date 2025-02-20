@@ -6,9 +6,13 @@ from utils.pdf_manager import PDFManager
 import io
 from datetime import datetime
 import pytz
+from utils.error_handler import handle_error
+import logging
 
 # Definir timezone de São Paulo
 SP_TZ = pytz.timezone('America/Sao_Paulo')
+
+logger = logging.getLogger(__name__)
 
 def get_sp_datetime():
     """Retorna a data e hora atual no timezone de São Paulo"""
@@ -153,76 +157,89 @@ def render_onboarding():
         
         if submitted:
             try:
-                with st.spinner("Processando cadastro..."):
-                    # 1. Criar pasta no Google Drive com timestamp SP
-                    sp_now = get_sp_datetime()
-                    folder_name = f"{nome_completo}_{sp_now.strftime('%Y%m%d_%H%M%S')}"
-                    folder_id = google_manager.create_folder(folder_name)
-                    
-                    # 2. Processar documentos
-                    doc_ids = {
-                        'identidade': handle_file_upload(doc_identidade, folder_id, google_manager),
-                        'residencia': handle_file_upload(doc_residencia, folder_id, google_manager),
-                        'outros': [handle_file_upload(doc, folder_id, google_manager) 
-                                 for doc in outros_docs if doc is not None]
-                    }
-                    
-                    # 3. Preparar dados para o Supabase com data SP
-                    client_data = {
-                        'nome_completo': nome_completo,
-                        'nacionalidade': nacionalidade,
-                        'estado_civil': estado_civil,
-                        'profissao': profissao,
-                        'email': email,
-                        'celular': celular,
-                        'data_nascimento': data_nascimento.isoformat(),  # A data de nascimento não precisa de timezone
-                        'rg': rg,
-                        'cpf': cpf,
-                        'caso': caso,
-                        'assunto_caso': assunto_caso,
-                        'responsavel_comercial': responsavel_comercial,
-                        'endereco': endereco,
-                        'bairro': bairro,
-                        'cidade': cidade,
-                        'estado': estado,
-                        'cep': cep,
-                        'pasta_drive_id': folder_id,
-                        'documentos': doc_ids,
-                        'created_at': sp_now.isoformat()  # Adiciona timestamp SP
-                    }
-                    
-                    # 4. Salvar no Supabase
-                    supabase_manager.insert_client_data('clientes', client_data)
-                    
-                    # 5. Atualizar planilhas do Google Sheets
-                    google_manager.update_sheets_with_client_data(client_data)
-                    
-                    # 6. Preencher template do Google Docs
+                # Criar barra de progresso
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                # 1. Criar pasta no Drive
+                status_text.text("Criando pasta no Google Drive...")
+                progress_bar.progress(10)
+                sp_now = get_sp_datetime()
+                folder_name = f"{nome_completo}_{sp_now.strftime('%Y%m%d_%H%M%S')}"
+                folder_id = google_manager.create_folder(folder_name)
+                
+                # 2. Upload de documentos
+                status_text.text("Fazendo upload dos documentos...")
+                progress_bar.progress(30)
+                doc_ids = {
+                    'identidade': handle_file_upload(doc_identidade, folder_id, google_manager),
+                    'residencia': handle_file_upload(doc_residencia, folder_id, google_manager),
+                    'outros': [handle_file_upload(doc, folder_id, google_manager) 
+                             for doc in outros_docs if doc is not None]
+                }
+                
+                # 3. Salvando no banco
+                status_text.text("Salvando informações...")
+                progress_bar.progress(60)
+                client_data = {
+                    'nome_completo': nome_completo,
+                    'nacionalidade': nacionalidade,
+                    'estado_civil': estado_civil,
+                    'profissao': profissao,
+                    'email': email,
+                    'celular': celular,
+                    'data_nascimento': data_nascimento.isoformat(),  # A data de nascimento não precisa de timezone
+                    'rg': rg,
+                    'cpf': cpf,
+                    'caso': caso,
+                    'assunto_caso': assunto_caso,
+                    'responsavel_comercial': responsavel_comercial,
+                    'endereco': endereco,
+                    'bairro': bairro,
+                    'cidade': cidade,
+                    'estado': estado,
+                    'cep': cep,
+                    'pasta_drive_id': folder_id,
+                    'documentos': doc_ids,
+                    'created_at': sp_now.isoformat()  # Adiciona timestamp SP
+                }
+                supabase_manager.insert_client_data('clientes', client_data)
+                
+                # 4. Gerando documentos
+                status_text.text("Gerando documentos...")
+                progress_bar.progress(90)
+                google_manager.update_sheets_with_client_data(client_data)
+                try:
+                    logger.info(f"Iniciando preenchimento do template para {nome_completo}")
                     template_data = {
                         'nome': nome_completo,
                         'cpf': cpf,
                         'endereco': f"{endereco}, {bairro}, {cidade}/{estado}",
                         'caso': caso,
-                        'data': format_sp_datetime(sp_now).split()[0]  # Apenas a data no formato BR
+                        'data': format_sp_datetime(sp_now).split()[0]
                     }
                     doc_id = google_manager.fill_document_template(
                         st.secrets["TEMPLATE_DOC_ID"], 
                         template_data
                     )
-                    
-                    # 7. Converter documento preenchido para PDF e salvar no Drive
-                    pdf_content = google_manager.export_to_pdf(doc_id)
-                    google_manager.upload_file(
-                        f"contrato_{nome_completo}.pdf",
-                        pdf_content,
-                        'application/pdf',
-                        folder_id
-                    )
-                    
-                    st.success("Cliente cadastrado com sucesso!")
-                    
+                    logger.info(f"Template preenchido com sucesso. ID: {doc_id}")
+                except Exception as e:
+                    logger.error(f"Erro ao preencher template: {str(e)}")
+                    raise
+                pdf_content = google_manager.export_to_pdf(doc_id)
+                google_manager.upload_file(
+                    f"contrato_{nome_completo}.pdf",
+                    pdf_content,
+                    'application/pdf',
+                    folder_id
+                )
+                
+                progress_bar.progress(100)
+                status_text.text("Concluído!")
+                st.success("Cliente cadastrado com sucesso!")
+                
             except Exception as e:
-                st.error(f"Erro ao processar cadastro: {str(e)}")
+                handle_error(e)
 
 if __name__ == "__main__":
     if not check_authentication(init_managers()[0].supabase):

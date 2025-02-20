@@ -94,11 +94,20 @@ class GoogleManager:
     def fill_document_template(self, template_id: str, replacements: Dict[str, str]) -> str:
         """Preenche um modelo do Google Docs com dados e salva como PDF"""
         try:
+            # Verifica se tem acesso ao documento
+            try:
+                self.docs_service.documents().get(documentId=template_id).execute()
+            except Exception as e:
+                raise DriveError(f"Erro ao acessar template. Verifique as permissões: {str(e)}")
+            
             # Copia o template
-            copied_file = self.drive_service.files().copy(
-                fileId=template_id,
-                body={'name': f'Preenchido_{template_id}'}
-            ).execute()
+            try:
+                copied_file = self.drive_service.files().copy(
+                    fileId=template_id,
+                    body={'name': f'Preenchido_{template_id}'}
+                ).execute()
+            except Exception as e:
+                raise DriveError(f"Erro ao copiar template: {str(e)}")
             
             # Prepara as substituições
             requests = []
@@ -114,14 +123,17 @@ class GoogleManager:
                 })
             
             # Aplica as substituições
-            self.docs_service.documents().batchUpdate(
-                documentId=copied_file['id'],
-                body={'requests': requests}
-            ).execute()
+            try:
+                self.docs_service.documents().batchUpdate(
+                    documentId=copied_file['id'],
+                    body={'requests': requests}
+                ).execute()
+            except Exception as e:
+                raise DriveError(f"Erro ao preencher documento: {str(e)}")
             
             return copied_file['id']
         except Exception as e:
-            raise Exception(f"Erro ao preencher documento: {str(e)}")
+            raise DriveError(f"Erro ao processar template: {str(e)}")
 
     def export_to_pdf(self, doc_id: str) -> bytes:
         """Exporta um documento do Google Docs para PDF"""
