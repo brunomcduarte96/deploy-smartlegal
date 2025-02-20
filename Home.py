@@ -113,31 +113,7 @@ def render_home():
     
     # Seções existentes
     st.markdown("---")
-    st.header("Funcionalidades do Sistema")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Onboarding")
-        st.markdown("""
-        - Cadastro de novos clientes
-        - Geração automática de procuração
-        - Upload e organização de documentos
-        - Armazenamento no Google Drive
-        """)
-    
-    with col2:
-        st.subheader("Módulo Aéreo")
-        st.markdown("""
-        #### Atraso / Cancelamento de Voo
-        - Geração de petições iniciais
-        - Cálculo de indenizações
-        - Jurisprudência específica
-        
-        #### Extravio de Bagagem
-        - Petições automatizadas
-        - Cálculo de danos materiais
-        - Precedentes judiciais
-        """)
+
 
 if __name__ == "__main__":
     main() 
