@@ -1,0 +1,23 @@
+Deploy_SmartLegal/
+├── .streamlit/
+│   └── config.toml
+├── pages/
+│   ├── 1_Menu.py
+│   ├── 2_Onboarding.py
+│   ├── 3_Atraso_Cancelamento.py
+│   ├── 4_Extravio_Bagagem.py
+│   ├── 5_Downgrade.py
+│   └── 6_Overbooking.py
+├── utils/
+│   ├── __init__.py
+│   ├── supabase_manager.py
+│   ├── google_manager.py
+│   ├── pdf_manager.py
+│   ├── openai_manager.py
+│   └── auth_manager.py
+├── config/
+│   ├── __init__.py
+│   └── settings.py
+├── .gitignore
+├── requirements.txt
+└── Home.py 

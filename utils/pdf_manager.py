@@ -1,0 +1,87 @@
+import os
+from typing import Union, List
+from PyPDF2 import PdfReader, PdfWriter
+from pdf2image import convert_from_bytes
+import io
+from docx import Document
+
+class PDFManager:
+    @staticmethod
+    def check_pdf(file_content: bytes) -> bool:
+        """Verifica se o arquivo é um PDF válido"""
+        try:
+            PdfReader(io.BytesIO(file_content))
+            return True
+        except:
+            return False
+
+    @staticmethod
+    def convert_to_pdf(file_content: bytes, file_type: str) -> bytes:
+        """Converte diferentes tipos de arquivo para PDF"""
+        try:
+            if file_type == 'docx':
+                return PDFManager._convert_docx_to_pdf(file_content)
+            elif file_type in ['jpg', 'jpeg', 'png']:
+                return PDFManager._convert_image_to_pdf(file_content)
+            else:
+                raise ValueError(f"Formato não suportado: {file_type}")
+        except Exception as e:
+            raise Exception(f"Erro na conversão para PDF: {str(e)}")
+
+    @staticmethod
+    def _convert_docx_to_pdf(docx_content: bytes) -> bytes:
+        """Converte arquivo DOCX para PDF"""
+        try:
+            # Salva o conteúdo do DOCX em um arquivo temporário
+            doc = Document(io.BytesIO(docx_content))
+            temp_docx = io.BytesIO()
+            doc.save(temp_docx)
+            temp_docx.seek(0)
+            
+            # TODO: Implementar conversão DOCX para PDF
+            # Nota: Esta é uma implementação simplificada
+            # Para uma solução completa, considere usar libraries como docx2pdf
+            # ou uma API de conversão
+            
+            raise NotImplementedError("Conversão DOCX para PDF ainda não implementada")
+        except Exception as e:
+            raise Exception(f"Erro na conversão DOCX para PDF: {str(e)}")
+
+    @staticmethod
+    def _convert_image_to_pdf(image_content: bytes) -> bytes:
+        """Converte imagem para PDF"""
+        try:
+            # Converte a imagem para PDF usando pdf2image
+            output = io.BytesIO()
+            images = convert_from_bytes(image_content)
+            
+            pdf_writer = PdfWriter()
+            for image in images:
+                img_byte_arr = io.BytesIO()
+                image.save(img_byte_arr, format='PDF')
+                img_byte_arr.seek(0)
+                
+                pdf_reader = PdfReader(img_byte_arr)
+                pdf_writer.add_page(pdf_reader.pages[0])
+            
+            pdf_writer.write(output)
+            return output.getvalue()
+        except Exception as e:
+            raise Exception(f"Erro na conversão de imagem para PDF: {str(e)}")
+
+    @staticmethod
+    def merge_pdfs(pdf_contents: List[bytes]) -> bytes:
+        """Combina múltiplos PDFs em um único arquivo"""
+        try:
+            output = io.BytesIO()
+            pdf_writer = PdfWriter()
+            
+            for pdf_content in pdf_contents:
+                pdf_reader = PdfReader(io.BytesIO(pdf_content))
+                for page in pdf_reader.pages:
+                    pdf_writer.add_page(page)
+            
+            pdf_writer.write(output)
+            return output.getvalue()
+        except Exception as e:
+            raise Exception(f"Erro ao combinar PDFs: {str(e)}") 
