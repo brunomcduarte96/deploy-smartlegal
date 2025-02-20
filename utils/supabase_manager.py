@@ -1,15 +1,30 @@
 from supabase import create_client, Client
 from config.settings import SUPABASE_URL, SUPABASE_KEY
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import streamlit as st
 
 class SupabaseManager:
     def __init__(self):
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     
+    def check_email_exists(self, email: str) -> bool:
+        """Verifica se o email já existe no banco"""
+        try:
+            response = self.supabase.table('clientes')\
+                .select('email')\
+                .eq('email', email)\
+                .execute()
+            return len(response.data) > 0
+        except Exception as e:
+            raise Exception(f"Erro ao verificar email: {str(e)}")
+    
     def insert_client_data(self, table: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Insere dados do cliente na tabela especificada"""
         try:
+            # Verifica se o email já existe
+            if self.check_email_exists(data['email']):
+                raise Exception("Email já cadastrado no sistema")
+                
             response = self.supabase.table(table).insert(data).execute()
             return response.data[0]
         except Exception as e:
@@ -105,6 +120,25 @@ class SupabaseManager:
             return response.data
         except Exception as e:
             raise Exception(f"Erro ao buscar clientes por nome parcial: {str(e)}")
+
+    def get_client_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """
+        Busca cliente pelo email
+        
+        Args:
+            email: Email do cliente
+        
+        Returns:
+            Dados do cliente ou None se não encontrado
+        """
+        try:
+            response = self.supabase.table('clientes')\
+                .select('*')\
+                .eq('email', email)\
+                .execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            raise Exception(f"Erro ao buscar cliente por email: {str(e)}")
 
 def init_supabase() -> Client:
     """Inicializa o cliente Supabase"""

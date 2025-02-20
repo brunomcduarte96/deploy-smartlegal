@@ -9,6 +9,7 @@ import pytz
 from utils.error_handler import handle_error
 import logging
 from utils.date_utils import data_por_extenso
+from utils.text_utils import format_title_case
 
 # Definir timezone de São Paulo
 SP_TZ = pytz.timezone('America/Sao_Paulo')
@@ -158,6 +159,25 @@ def render_onboarding():
         
         if submitted:
             try:
+                # Formata os dados
+                nome_completo = format_title_case(nome_completo)
+                nacionalidade = format_title_case(nacionalidade)
+                profissao = format_title_case(profissao)
+                bairro = format_title_case(bairro)
+                cidade = format_title_case(cidade)
+                
+                # Validar email antes de prosseguir
+                if supabase_manager.check_email_exists(email):
+                    st.warning("Este email já está cadastrado no sistema.")
+                    
+                    # Busca dados do cliente existente
+                    cliente_existente = supabase_manager.get_client_by_email(email)
+                    if cliente_existente:
+                        folder_url = f"https://drive.google.com/drive/folders/{cliente_existente['pasta_drive_id']}"
+                        st.info(f"Acesse a pasta do cliente: [Clique aqui]({folder_url})")
+                    
+                    st.stop()
+                
                 # Criar barra de progresso
                 progress_bar = st.progress(0)
                 status_text = st.empty()
@@ -245,6 +265,7 @@ def render_onboarding():
                 
             except Exception as e:
                 handle_error(e)
+                st.stop()
 
 if __name__ == "__main__":
     if not check_authentication(init_managers()[0].supabase):

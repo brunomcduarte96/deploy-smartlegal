@@ -14,6 +14,7 @@ from config.settings import (
     ROOT_FOLDER_ID
 )
 from utils.date_utils import data_por_extenso
+from utils.error_handler import DriveError
 from datetime import datetime
 from docx import Document
 import re
@@ -22,6 +23,8 @@ from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
+
+logger.info(f"Diretório atual: {os.getcwd()}")
 
 class GoogleManager:
     def __init__(self):
@@ -63,9 +66,8 @@ class GoogleManager:
             last_row = len(result.get('values', [])) + 1
             
             # Ajusta o range para apontar para a próxima linha vazia
-            sheet_name = range_name.split('!')[0] if '!' in range_name else ''
-            column_range = range_name.split(':')[1] if ':' in range_name else 'Q'
-            new_range = f"{sheet_name}A{last_row}:{column_range}{last_row}"
+            column_range = range_name.split(':')[1]
+            new_range = f"A{last_row}:{column_range}{last_row}"
             
             # Faz o append dos dados
             body = {'values': values}
@@ -126,14 +128,16 @@ class GoogleManager:
         Retorna: (pdf_id, docx_id)
         """
         try:
-            # Verifica se o arquivo existe
-            template_full_path = Path(__file__).parent.parent / 'templates' / template_path
-            if not template_full_path.exists():
+            # Verifica se o arquivo existe (usando caminho absoluto)
+            template_full_path = os.path.join(os.getcwd(), 'templates', template_path)
+            if not os.path.exists(template_full_path):
                 raise DriveError(f"Template não encontrado: {template_full_path}")
+            
+            logger.info(f"Usando template em: {template_full_path}")
 
             # Carrega o template
             try:
-                doc = Document(str(template_full_path))
+                doc = Document(template_full_path)
             except Exception as e:
                 raise DriveError(f"Erro ao carregar template: {str(e)}")
             
@@ -231,29 +235,64 @@ class GoogleManager:
     def update_sheets_with_client_data(self, client_data: Dict[str, Any], folder_url: str):
         """Atualiza as duas planilhas com os dados do cliente"""
         try:
+            # Formata a data de nascimento
+            data_nascimento = datetime.fromisoformat(client_data['data_nascimento'])
+            data_nascimento_formatada = data_nascimento.strftime('%d/%m/%Y')
+            
             # Atualiza primeira planilha (todos os dados)
-            values1 = [[client_data[field] for field in [
-                'nome_completo', 'nacionalidade', 'estado_civil', 'profissao',
-                'email', 'celular', 'data_nascimento', 'rg', 'cpf',
-                'caso', 'assunto_caso', 'responsavel_comercial',
-                'endereco', 'bairro', 'cidade', 'estado', 'cep'
-            ]]]
-            self.update_sheet(SHEET_ID_1, 'Dados!A:Q', values1)
+            values1 = [[
+                client_data['nome_completo'],
+                client_data['nacionalidade'],
+                client_data['estado_civil'],
+                client_data['profissao'],
+                client_data['email'],
+                client_data['celular'],
+                data_nascimento_formatada,  # Data formatada
+                client_data['rg'],
+                client_data['cpf'],
+                client_data['caso'],
+                client_data['assunto_caso'],
+                client_data['responsavel_comercial'],
+                client_data['endereco'],
+                client_data['bairro'],
+                client_data['cidade'],
+                client_data['estado'],
+                client_data['cep'],
+                folder_url
+            ]]
+            
+            # Append direto na primeira planilha
+            self.sheets_service.spreadsheets().values().append(
+                spreadsheetId=SHEET_ID_1,
+                range='A:R',  # Ajustado para incluir a coluna do link
+                valueInputOption='USER_ENTERED',
+                insertDataOption='INSERT_ROWS',
+                body={'values': values1}
+            ).execute()
             logger.info(f"Planilha 1 atualizada com dados de {client_data['nome_completo']}")
             
             # Atualiza segunda planilha (dados específicos)
             current_date = datetime.now().strftime('%d/%m/%Y')
             values2 = [[
-                client_data['nome_completo'],
-                current_date,
-                client_data['responsavel_comercial'],
-                client_data['caso'],
-                client_data['assunto_caso'],
-                "Em andamento",
-                client_data['nome_completo'],
-                folder_url
+                client_data['nome_completo'],      # A: Cliente
+                current_date,                      # B: Data Entrada
+                client_data['responsavel_comercial'], # C: Responsavel Comercial
+                client_data['caso'],              # D: Caso
+                client_data['assunto_caso'],      # E: Assunto Caso
+                "",                               # F: Quem está fazendo (vazio)
+                "Em andamento",                   # G: Status
+                "",                               # H: Data Audiencia (vazio)
+                folder_url                        # I: Pasta Drive
             ]]
-            self.update_sheet(SHEET_ID_2, 'Dados!A:H', values2)
+            
+            # Append direto na segunda planilha
+            self.sheets_service.spreadsheets().values().append(
+                spreadsheetId=SHEET_ID_2,
+                range='A:I',  # Ajustado para incluir todas as colunas
+                valueInputOption='USER_ENTERED',
+                insertDataOption='INSERT_ROWS',
+                body={'values': values2}
+            ).execute()
             logger.info(f"Planilha 2 atualizada com dados de {client_data['nome_completo']}")
             
         except Exception as e:
