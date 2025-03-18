@@ -193,6 +193,107 @@ class SupabaseManager:
         except Exception:
             return False
 
+    def get_all_clients(self):
+        """Fetch all clients from the database"""
+        try:
+            response = self.supabase.table('clientes').select('*').execute()
+            return response.data
+        except Exception as e:
+            print(f"Error fetching clients: {str(e)}")
+            raise e
+
+    def update_client(self, client_id, data):
+        """Update a client in the database
+        
+        Args:
+            client_id: The ID of the client to update
+            data: Dictionary containing the fields to update
+        """
+        try:
+            response = self.supabase.table('clientes').update(data).eq('id', client_id).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error updating client: {str(e)}")
+            raise e
+
+    def delete_client(self, client_id):
+        """Delete a client from the database
+        
+        Args:
+            client_id: The ID of the client to delete
+        """
+        try:
+            response = self.supabase.table('clientes').delete().eq('id', client_id).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error deleting client: {str(e)}")
+            raise e
+
+    def get_client_cases(self, client_id):
+        """Get all cases associated with a client
+        
+        Args:
+            client_id: The ID of the client
+            
+        Returns:
+            List of cases associated with the client
+        """
+        try:
+            response = self.supabase.table('casos').select('*').eq('cliente_id', client_id).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error fetching client cases: {str(e)}")
+            raise e
+
+    def get_all_companies(self):
+        """Fetch all airline companies from the database"""
+        try:
+            response = self.supabase.table('companhiasAereas').select('*').execute()
+            return response.data
+        except Exception as e:
+            print(f"Error fetching companies: {str(e)}")
+            raise e
+
+    def add_company(self, company_data):
+        """Add a new airline company to the database
+        
+        Args:
+            company_data: Dictionary containing the company data
+        """
+        try:
+            response = self.supabase.table('companhiasAereas').insert(company_data).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error adding company: {str(e)}")
+            raise e
+
+    def update_company(self, company_id, data):
+        """Update an airline company in the database
+        
+        Args:
+            company_id: The ID of the company to update
+            data: Dictionary containing the fields to update
+        """
+        try:
+            response = self.supabase.table('companhiasAereas').update(data).eq('id', company_id).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error updating company: {str(e)}")
+            raise e
+
+    def delete_company(self, company_id):
+        """Delete an airline company from the database
+        
+        Args:
+            company_id: The ID of the company to delete
+        """
+        try:
+            response = self.supabase.table('companhiasAereas').delete().eq('id', company_id).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error deleting company: {str(e)}")
+            raise e
+
 def init_supabase() -> Client:
     """Inicializa o cliente Supabase"""
     try:

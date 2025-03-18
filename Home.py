@@ -1,6 +1,9 @@
 import streamlit as st
 from sections.onboarding import render_onboarding
 from sections.atraso_voo import render_atraso_voo
+from sections.clientes import render_clientes
+from sections.jurisprudencias import render_jurisprudencias
+from sections.empresas import render_empresas
 from utils.auth_manager import check_authentication, handle_logout
 import os
 
@@ -25,11 +28,23 @@ def render_sidebar():
     if st.sidebar.button("Onboarding", use_container_width=True):
         st.session_state.current_page = "onboarding"
         st.rerun()
+    
+    if st.sidebar.button("Clientes", use_container_width=True):
+        st.session_state.current_page = "clientes"
+        st.rerun()
         
     st.sidebar.divider()  # Separador
     
     # Seção Jurídico
     st.sidebar.markdown("#### Jurídico")
+    if st.sidebar.button("Jurisprudências", use_container_width=True):
+        st.session_state.current_page = "jurisprudencias"
+        st.rerun()
+    
+    if st.sidebar.button("Empresas", use_container_width=True):
+        st.session_state.current_page = "empresas"
+        st.rerun()
+    
     if st.sidebar.button("Atraso / Cancelamento de Voo", use_container_width=True):
         st.session_state.current_page = "atraso_voo"
         st.rerun()
@@ -68,6 +83,12 @@ def main():
         render_onboarding()
     elif st.session_state.current_page == "atraso_voo":
         render_atraso_voo()
+    elif st.session_state.current_page == "clientes":
+        render_clientes()
+    elif st.session_state.current_page == "jurisprudencias":
+        render_jurisprudencias()
+    elif st.session_state.current_page == "empresas":
+        render_empresas()
 
 if __name__ == "__main__":
     st.set_page_config(

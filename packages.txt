@@ -5,4 +5,7 @@ build-essential
 libjpeg-dev
 libpng-dev
 libtiff-dev
-poppler-utils 
+poppler-utils
+ffmpeg
+libavcodec-extra
+libav-tools 
