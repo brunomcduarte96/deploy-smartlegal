@@ -230,20 +230,17 @@ class SupabaseManager:
             raise e
 
     def get_client_cases(self, client_id):
-        """Get all cases associated with a client
-        
-        Args:
-            client_id: The ID of the client
-            
-        Returns:
-            List of cases associated with the client
-        """
+        """Busca todos os casos de um cliente específico"""
         try:
-            response = self.supabase.table('casos').select('*').eq('cliente_id', client_id).execute()
+            response = self.supabase.table('casos')\
+                .select('id, nome_cliente, caso, assunto_caso, responsavel_comercial, pasta_caso_id, pasta_caso_url, created_at, chave_caso')\
+                .eq('cliente_id', client_id)\
+                .order('chave_caso', desc=True)\
+                .execute()
             return response.data
         except Exception as e:
-            print(f"Error fetching client cases: {str(e)}")
-            raise e
+            logger.error(f"Erro ao buscar casos do cliente: {str(e)}")
+            return []
 
     def get_all_companies(self):
         """Fetch all airline companies from the database"""
