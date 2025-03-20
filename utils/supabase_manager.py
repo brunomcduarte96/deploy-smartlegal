@@ -3,6 +3,7 @@ from config.settings import SUPABASE_URL, SUPABASE_KEY
 from typing import Dict, Any, List, Optional
 import streamlit as st
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -290,6 +291,22 @@ class SupabaseManager:
         except Exception as e:
             print(f"Error deleting company: {str(e)}")
             raise e
+
+    def save_facts_for_training(self, caso: str, input_text: str, output_text: str):
+        """Salva os fatos gerados para treinamento"""
+        try:
+            data = {
+                'caso': caso,
+                'input': input_text,
+                'output': output_text,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            response = self.supabase.table('fatosGPT').insert(data).execute()
+            return response.data
+        except Exception as e:
+            logger.error(f"Erro ao salvar fatos para treinamento: {str(e)}")
+            raise Exception(f"Erro ao salvar para treinamento: {str(e)}")
 
 def init_supabase() -> Client:
     """Inicializa o cliente Supabase"""

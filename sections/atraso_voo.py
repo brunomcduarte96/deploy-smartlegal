@@ -246,28 +246,23 @@ def extract_flight_info(fatos_cliente):
         logger.error(f"Erro ao processar texto com OpenAI: {str(e)}")
         raise e
 
-def generate_facts_with_assistant(flight_info):
-    """Gera os fatos formatados usando o OpenAI Assistant"""
+def generate_facts_with_assistant(flight_info, fatos_cliente):
+    """Gera os fatos formatados usando o OpenAI Assistant específico"""
     try:
         client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         
-        # Criar um assistant temporário
-        assistant = client.beta.assistants.create(
-            name="Gerador de Fatos",
-            instructions="""Você é um especialista em direito do consumidor, 
-            especializado em casos de atrasos e cancelamentos de voos. 
-            Sua tarefa é gerar um texto bem formatado descrevendo os fatos do caso,
-            usando as informações fornecidas para criar uma narrativa clara e objetiva.
-            Use parágrafos bem estruturados e mantenha um tom profissional.""",
-            model="gpt-4-turbo-preview"
-        )
+        # Usar o assistant específico
+        assistant_id = "asst_Yjlfjp23PwM2qiN6ckjxUspB"
         
         # Criar um thread
         thread = client.beta.threads.create()
         
         # Preparar as informações do voo em um formato mais legível
         message_content = f"""
-        Por favor, gere um texto descrevendo os fatos deste caso usando as seguintes informações:
+        FATOS RELATADOS PELO CLIENTE:
+        {fatos_cliente}
+        
+        DADOS COMPLEMENTARES DO VOO:
         
         DADOS DO VOO:
         - Tipo: {flight_info['tipo_voo']}
@@ -308,7 +303,7 @@ def generate_facts_with_assistant(flight_info):
         # Executar o assistant
         run = client.beta.threads.runs.create(
             thread_id=thread.id,
-            assistant_id=assistant.id
+            assistant_id=assistant_id
         )
         
         # Aguardar a conclusão
@@ -319,14 +314,15 @@ def generate_facts_with_assistant(flight_info):
             )
             if run_status.status == 'completed':
                 break
+            elif run_status.status == 'failed':
+                raise Exception("O assistente falhou ao processar a solicitação")
+            elif run_status.status == 'expired':
+                raise Exception("A solicitação expirou")
             time.sleep(1)
         
         # Obter a resposta
         messages = client.beta.threads.messages.list(thread_id=thread.id)
         response = messages.data[0].content[0].text.value
-        
-        # Limpar recursos
-        client.beta.assistants.delete(assistant.id)
         
         return response
         
@@ -577,24 +573,264 @@ def render_facts_section():
     
     # Seção de Geração de Fatos
     st.markdown("---")
+    
+    # Verificar se todos os dados necessários estão presentes
     if st.button("Gerar Fatos", type="primary"):
+        if not fatos_cliente:
+            st.error("Por favor, preencha os fatos relatados pelo cliente antes de gerar os fatos.")
+            return
+            
+        if not hasattr(st.session_state, 'flight_info'):
+            st.error("Por favor, preencha as informações do voo antes de gerar os fatos.")
+            return
+            
         try:
             with st.spinner("Gerando fatos do caso..."):
-                generated_facts = generate_facts_with_assistant(st.session_state.flight_info)
+                generated_facts = generate_facts_with_assistant(
+                    st.session_state.flight_info,
+                    fatos_cliente
+                )
                 st.session_state.generated_facts = generated_facts
                 st.success("Fatos gerados com sucesso!")
         except Exception as e:
-            st.error(str(e))
+            st.error(f"Erro ao gerar fatos: {str(e)}")
+            if st.button("Tentar Novamente"):
+                st.rerun()
     
-    # Mostrar os fatos gerados em uma caixa editável
+    # Mostrar os fatos gerados em uma caixa editável se existirem
     if 'generated_facts' in st.session_state:
-        st.text_area(
+        st.markdown("### Fatos Gerados")
+        st.markdown("_Você pode editar o texto abaixo se necessário:_")
+        edited_facts = st.text_area(
             "Fatos do Caso",
             value=st.session_state.generated_facts,
             height=400,
             key="facts_text_area"
         )
-        st.markdown("---")  # Adiciona um separador após os fatos
+        
+        # Salvar os fatos editados na session_state
+        if edited_facts != st.session_state.generated_facts:
+            st.session_state.generated_facts = edited_facts
+            st.info("As alterações foram salvas!")
+    
+    # Botões de ação (sempre visíveis)
+    st.markdown("### Ações")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        # Botão Gerar Novamente
+        if st.button("Gerar Novamente", type="primary", use_container_width=True, key="btn_gerar"):
+            if not fatos_cliente:
+                st.error("Por favor, preencha os fatos relatados pelo cliente antes de gerar os fatos.")
+                return
+            
+            if not hasattr(st.session_state, 'flight_info'):
+                st.error("Por favor, preencha as informações do voo antes de gerar os fatos.")
+                return
+            
+            try:
+                with st.spinner("Gerando novos fatos..."):
+                    generated_facts = generate_facts_with_assistant(
+                        st.session_state.flight_info,
+                        fatos_cliente
+                    )
+                    st.session_state.generated_facts = generated_facts
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao gerar novos fatos: {str(e)}")
+        
+        # Botão Salvar para Treinamento
+        if st.button("Salvar para Treinamento", type="primary", use_container_width=True, key="btn_salvar"):
+            if not hasattr(st.session_state, 'generated_facts'):
+                st.error("Por favor, gere os fatos antes de salvar para treinamento.")
+                return
+                
+            try:
+                supabase = SupabaseManager()
+                caso = st.session_state.selected_case_data.get('assunto_caso', 'Não informado')
+                
+                # Recriar o message_content
+                message_content = f"""
+                FATOS RELATADOS PELO CLIENTE:
+                {fatos_cliente}
+                
+                DADOS COMPLEMENTARES DO VOO:
+                
+                DADOS DO VOO:
+                - Tipo: {st.session_state.flight_info['tipo_voo']}
+                - Origem: {st.session_state.flight_info['origem_voo']}
+                - Destino: {st.session_state.flight_info['destino_voo']}
+                - Escala: {st.session_state.flight_info['escala']}
+                - Data Prevista: {st.session_state.flight_info['data_voo_inicial']}
+                - Horário Previsto: {st.session_state.flight_info['horario_voo_inicial']}
+                - Data Real: {st.session_state.flight_info['data_voo_real']}
+                - Horário Real: {st.session_state.flight_info['horario_voo_real']}
+                - Tempo de Atraso: {st.session_state.flight_info['tempo_atraso']}
+                
+                DETALHES DO PROBLEMA:
+                - Motivo da Viagem: {st.session_state.flight_info['motivo_voo']}
+                - Problema: {st.session_state.flight_info['problema']}
+                - Local do Problema: {st.session_state.flight_info['local_problema']}
+                - Momento da Informação: {st.session_state.flight_info['momento_informacao']}
+                - Compromisso Perdido: {st.session_state.flight_info['compromisso_perdido']}
+                - Contexto do Passageiro: {st.session_state.flight_info['contexto']}
+                
+                AUXÍLIOS E CUSTOS:
+                - Solicitou Reacomodação: {st.session_state.flight_info['solicitou_reacomodacao']}
+                - Opção Recebida: {st.session_state.flight_info['opcao_reacomodacao']}
+                - Recebeu Auxílio: {st.session_state.flight_info['recebeu_auxilio']}
+                - Auxílio Recebido: {st.session_state.flight_info['auxilio_recebido']}
+                - Teve Custos: {st.session_state.flight_info['teve_custos']}
+                - Descrição dos Custos: {st.session_state.flight_info['descricao_custos']}
+                - Valor Total: {st.session_state.flight_info['valor_total_custos']}
+                """
+                
+                # Salvar no banco de dados
+                supabase.save_facts_for_training(
+                    caso=caso,
+                    input_text=message_content,
+                    output_text=st.session_state.generated_facts
+                )
+                
+                st.success("Fatos salvos para treinamento com sucesso!")
+                
+            except Exception as e:
+                st.error(f"Erro ao salvar para treinamento: {str(e)}")
+    
+    st.markdown("---")
+
+    # Seção de Petição Inicial
+    st.markdown("### Petição Inicial")
+    
+    # 1. Qualificação das Partes
+    st.markdown("#### 1. Qualificação das Partes")
+    
+    # Campo para Vara Cível
+    vara_civil = st.text_input("Vara Cível", key="vara_civil")
+    
+    # Verificar se temos os dados do cliente e da empresa
+    if hasattr(st.session_state, 'selected_client_data') and hasattr(st.session_state, 'selected_company_data'):
+        client_data = st.session_state.selected_client_data
+        company_data = st.session_state.selected_company_data
+        
+        # Campo de texto para qualificação do cliente
+        client_text = f"""{vara_civil}
+
+{client_data.get('nome_completo', '')}, \
+{client_data.get('nacionalidade', 'brasileiro(a)')}, \
+{client_data.get('estado_civil', '')}, \
+{client_data.get('profissao', '')}, \
+portador da carteira de identidade nº {client_data.get('rg', '')} \
+expedida pelo {client_data.get('orgao_emissor', '')}, \
+inscrito no CPF nº {client_data.get('cpf', '')}, \
+residente e domiciliado na {client_data.get('endereco', '')}, \
+CEP: {client_data.get('cep', '')}, \
+endereço eletrônico contato@smartlegabr.com, \
+por meio de seus advogados que a esta subscrevem, \
+com escritório na Rua Siqueira Campos, nº 243, salas 703, Copacabana, \
+Rio de Janeiro – RJ, CEP: 22.031-071, onde recebem intimações \
+com fulcro nos arts. 5º, inciso V da Constituição Federal c/c arts. 186 e 927 do Código Civil, \
+vem, respeitosamente propor a presente"""
+
+        st.text_area(
+            "Qualificação Cliente",
+            value=client_text,
+            height=200,
+            key="client_qualification"
+        )
+        
+        # Título da Ação
+        st.markdown("#### AÇÃO INDENIZATÓRIA POR DANOS MORAIS E MATERIAIS")
+        
+        # Campo de texto para qualificação da empresa
+        company_text = f"""em face de {company_data.get('nome', '')}, \
+pessoa jurídica de direito privado, \
+inscrita no CNPJ sob o nº {company_data.get('cnpj', '')}, \
+estabelecida à {company_data.get('endereco', '')}, \
+pelos fatos e fundamentos a seguir expostos."""
+
+        st.text_area(
+            "Qualificação Empresa",
+            value=company_text,
+            height=150,
+            key="company_qualification"
+        )
+        
+        # Título e texto das publicações
+        st.markdown("**DAS PUBLICAÇÕES**")
+        publications_text = """Quanto às publicações, requer seja anotado na capa destes autos o nome do advogado Dr. Marcelo Victor Pereira Nunes Cavalcante, inscrito na OAB/RJ-246336, para recebimento de todas as publicações oficiais, sob pena de nulidade, na forma do §2º do artigo 272 do CPC."""
+        
+        st.text_area(
+            "Das Publicações",
+            value=publications_text,
+            height=150,
+            key="publications_text"
+        )
+    else:
+        st.warning("Por favor, selecione um cliente e uma empresa aérea para gerar a qualificação.")
+    
+    st.markdown("---")
+    
+    # Dos Fatos
+    st.markdown("#### 2. Dos Fatos")
+    if 'generated_facts' in st.session_state:
+        st.text_area(
+            "Narrativa dos Fatos",
+            value=st.session_state.generated_facts,
+            height=300,
+            key="narrative_facts"
+        )
+    
+    st.markdown("---")
+    
+    # Do Direito
+    st.markdown("#### 3. Do Direito")
+    
+    # 3.1 - Título fixo
+    st.markdown("""
+    ##### 3.1 - DOS DEVERES DO TRANSPORTADOR EM DECORRÊNCIA DA FALHA NA PRESTAÇÃO DA INFORMAÇÃO – INOBSERVÂNCIA DO ART. 12 CAPUT DA RESOLUÇÃO Nº 400/2016 DA ANAC.
+    """)
+    
+    # Texto editável sobre os deveres do transportador
+    legal_text_1 = st.text_area(
+        "Fundamentação",
+        value="""Consoante o exposto na narrativa dos fatos, observamos o tratamento reprovável que a empresa Ré apresentou ao Autor, se eximindo da responsabilidade de prestar todas as informações concernentes ao voo.
+
+No que tange ao dever do transportador em prestar informações aos consumidores, a resolução nº 400 da ANAC buscou de forma prática amparar o usuário quanto ao seu direito de informação. Conforme aduz o art. 12:
+
+Art. 12. As alterações realizadas de forma programada pelo transportador, em especial quanto ao horário e itinerário originalmente contratados, deverão ser informadas aos passageiros com antecedência mínima de 72 (setenta e duas) horas.
+
+O prazo do transportador aéreo para informar ao consumidor sobre o cancelamento e/ou alteração do voo é de 72 horas, especialmente no que tange ao itinerário e horário.""",
+        height=300,
+        key="legal_text_1"
+    )
+    
+    # Separador para a próxima subseção
+    st.markdown("---")
+    
+    # Dos Pedidos
+    st.markdown("#### 4. Dos Pedidos")
+    if st.button("Gerar Pedidos", type="primary", use_container_width=True):
+        st.info("Em desenvolvimento: Geração automática dos pedidos")
+    
+    # Campo para exibir/editar os pedidos
+    st.text_area(
+        "Pedidos",
+        value="",  # Aqui virá o texto gerado pelo assistant
+        height=300,
+        key="requests"
+    )
+    
+    st.markdown("---")
+    
+    # Botão para gerar a petição completa
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("Gerar Petição Completa", type="primary", use_container_width=True):
+            st.info("Em desenvolvimento: Geração da petição inicial completa")
+    
+    st.markdown("---")
 
 def format_date(date_str):
     """Converte a data para o formato dd/mm/aaaa"""
