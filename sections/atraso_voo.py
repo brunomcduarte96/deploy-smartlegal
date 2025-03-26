@@ -63,8 +63,70 @@ def render_client_section():
                 
                 # Mostrar dados do cliente selecionado
                 st.write("**Dados do cliente selecionado:**")
-                for key, value in st.session_state.selected_client_data.items():
-                    st.write(f"**{key}:** {value}")
+                
+                # Criar duas colunas
+                col1, col2 = st.columns(2)
+                
+                # Filtrar campos que queremos mostrar (excluindo 'id')
+                campos = {k: v for k, v in st.session_state.selected_client_data.items() if k != 'id'}
+                
+                # Dividir os campos em duas listas de tamanho igual
+                total_campos = len(campos)
+                metade = (total_campos + 1) // 2  # +1 para garantir que todos os campos sejam mostrados
+                
+                # Preencher as colunas
+                with col1:
+                    for i, (key, value) in enumerate(campos.items()):
+                        if i < metade:
+                            st.write(f"**{key}:** {value}")
+                
+                with col2:
+                    for i, (key, value) in enumerate(campos.items()):
+                        if i >= metade:
+                            st.write(f"**{key}:** {value}")
+                
+                # Buscar casos do cliente
+                client_cases = supabase.get_client_cases(st.session_state.selected_client_data['id'])
+                
+                if client_cases:
+                    st.markdown("---")
+                    st.write("**Selecione o caso:**")
+                    
+                    # Criar lista de opções para o selectbox de casos
+                    case_options = {
+                        f"{case.get('chave_caso', 'Sem chave')} - {case.get('assunto_caso', 'Sem assunto')}": case 
+                        for case in client_cases
+                    }
+                    
+                    # Dropdown para seleção do caso
+                    selected_case = st.selectbox(
+                        "Casos do cliente",
+                        options=list(case_options.keys()),
+                        key="case_select"
+                    )
+                    
+                    if selected_case:
+                        # Salvar dados do caso selecionado
+                        st.session_state.selected_case_data = case_options[selected_case]
+                        
+                        # Mostrar informações do caso
+                        st.write("**Detalhes do caso:**")
+                        case_col1, case_col2 = st.columns(2)
+                        
+                        with case_col1:
+                            st.write(f"**Nome do Cliente:** {st.session_state.selected_case_data.get('nome_cliente', 'Não informado')}")
+                            st.write(f"**Caso:** {st.session_state.selected_case_data.get('caso', 'Não informado')}")
+                            st.write(f"**Assunto:** {st.session_state.selected_case_data.get('assunto_caso', 'Não informado')}")
+                            st.write(f"**Responsável:** {st.session_state.selected_case_data.get('responsavel_comercial', 'Não informado')}")
+                        
+                        with case_col2:
+                            st.write(f"**Chave do Caso:** {st.session_state.selected_case_data.get('chave_caso', 'Não informado')}")
+                            st.write(f"**ID da Pasta:** {st.session_state.selected_case_data.get('pasta_caso_id', 'Não informado')}")
+                            if pasta_url := st.session_state.selected_case_data.get('pasta_caso_url'):
+                                st.write(f"**URL da Pasta:** [Acessar]({pasta_url})")
+                            st.write(f"**Data de Criação:** {st.session_state.selected_case_data.get('created_at', 'Não informado')}")
+                else:
+                    st.info("Nenhum caso encontrado para este cliente")
         else:
             st.info("Nenhum cliente encontrado com esse nome.")
 
