@@ -101,15 +101,36 @@ def render_jurisprudencias():
             
         # Convert to DataFrame
         df = pd.DataFrame(jurisprudencias)
+        original_df = df.copy()
+        
+        # Show delete jurisprudencia section before the table
+        if st.session_state.get('show_delete_jurisprudencia', False):
+            st.subheader("Excluir Jurisprudência")
+            # Create options dictionary with format "Nome - Seção": id
+            delete_options = {f"{row['nome']} - {row['secao']}": row['id'] for idx, row in original_df.iterrows()}
+            
+            # Add a "Selecione..." option
+            delete_options = {"Selecione...": None, **delete_options}
+            
+            # Create the selectbox
+            selected_jurisprudencia = st.selectbox(
+                "Selecione a jurisprudência para excluir",
+                options=list(delete_options.keys()),
+                key="delete_jurisprudencia_select"
+            )
+            
+            # Add delete button
+            if selected_jurisprudencia != "Selecione..." and st.button("Excluir", type="primary"):
+                jurisprudencia_id = delete_options[selected_jurisprudencia]
+                if jurisprudencia_id:
+                    delete_jurisprudencia(jurisprudencia_id)
+            st.divider()
         
         # Format created_at column
         if 'created_at' in df.columns:
             df['created_at'] = pd.to_datetime(df['created_at']).dt.date
         
-        # Create a copy of original data for comparison
-        original_df = df.copy()
-        
-        # Reorder columns (remove Ações since we'll add buttons separately)
+        # Reorder columns
         columns_order = ['id', 'created_at', 'nome', 'secao', 'Tribunal', 'texto']
         df = df.reindex(columns=columns_order)
         
@@ -140,29 +161,6 @@ def render_jurisprudencias():
             on_change=lambda: st.session_state.update({'data_editor_changed': True})
         )
 
-        # Show delete jurisprudencia section
-        if st.session_state.get('show_delete_jurisprudencia', False):
-            st.subheader("Excluir Jurisprudência")
-            # Create options dictionary with format "Nome - Seção": id
-            delete_options = {f"{row['nome']} - {row['secao']}": row['id'] for idx, row in original_df.iterrows()}
-            
-            # Add a "Selecione..." option
-            delete_options = {"Selecione...": None, **delete_options}
-            
-            # Create the selectbox
-            selected_jurisprudencia = st.selectbox(
-                "Selecione a jurisprudência para excluir",
-                options=list(delete_options.keys()),
-                key="delete_jurisprudencia_select"
-            )
-            
-            # Add delete button
-            if selected_jurisprudencia != "Selecione..." and st.button("Excluir", type="primary"):
-                jurisprudencia_id = delete_options[selected_jurisprudencia]
-                if jurisprudencia_id:
-                    delete_jurisprudencia(jurisprudencia_id)
-            st.divider()
-        
         # Process any edits
         if st.session_state.get('data_editor_changed', False):
             edited_rows = {}

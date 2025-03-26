@@ -96,6 +96,11 @@ def render_empresas():
             st.session_state.show_delete_company = True
             st.session_state.show_add_company = False
     
+    # Show add company form
+    if st.session_state.get('show_add_company', False):
+        add_new_company()
+        st.divider()
+    
     supabase = SupabaseManager()
     
     try:
@@ -108,26 +113,9 @@ def render_empresas():
             
         # Convert to DataFrame
         df = pd.DataFrame(companies_data)
-        
-        # Add delete button column
-        df['Ações'] = None
-        
-        # Create a copy of original data for comparison
         original_df = df.copy()
         
-        # Get visible columns (excluding 'id')
-        visible_columns = ['nome', 'cnpj', 'endereco']
-        
-        # Display editable table
-        edited_df = st.data_editor(
-            df,
-            hide_index=True,
-            column_order=visible_columns,
-            key="company_editor",
-            on_change=lambda: st.session_state.update({'data_editor_changed': True})
-        )
-
-        # Show delete company section
+        # Show delete company section before the table
         if st.session_state.get('show_delete_company', False):
             st.subheader("Excluir Empresa")
             # Create options dictionary with format "Nome - CNPJ": id
@@ -150,6 +138,18 @@ def render_empresas():
                     delete_company(company_id)
             st.divider()
         
+        # Get visible columns (excluding 'id')
+        visible_columns = ['nome', 'cnpj', 'endereco']
+        
+        # Display editable table
+        edited_df = st.data_editor(
+            df,
+            hide_index=True,
+            column_order=visible_columns,
+            key="company_editor",
+            on_change=lambda: st.session_state.update({'data_editor_changed': True})
+        )
+
         # Process any edits
         if st.session_state.get('data_editor_changed', False):
             edited_rows = {}
