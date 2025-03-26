@@ -263,29 +263,54 @@ def generate_facts():
             default_headers={"OpenAI-Beta": "assistants=v2"}
         )
         
+        # Verificar se flight_info existe no session_state
+        if not hasattr(st.session_state, 'flight_info'):
+            raise Exception("Informações do voo não encontradas. Por favor, preencha os dados do voo primeiro.")
+
+        # Criar o dicionário flight_info com valores padrão
+        flight_info = {
+            'numero_voo': st.session_state.flight_info.get('numero_voo', 'Não informado'),
+            'data_voo': st.session_state.flight_info.get('data_voo', 'Não informado'),
+            'horario_previsto': st.session_state.flight_info.get('horario_previsto', 'Não informado'),
+            'horario_real': st.session_state.flight_info.get('horario_real', 'Não informado'),
+            'tempo_atraso': st.session_state.flight_info.get('tempo_atraso', 'Não informado'),
+            'problema': st.session_state.flight_info.get('problema', 'Não informado'),
+            'local_problema': st.session_state.flight_info.get('local_problema', 'Não informado'),
+            'momento_informacao': st.session_state.flight_info.get('momento_informacao', 'Não informado'),
+            'compromisso_perdido': st.session_state.flight_info.get('compromisso_perdido', 'Não informado'),
+            'contexto': st.session_state.flight_info.get('contexto', 'Não informado'),
+            'solicitou_reacomodacao': st.session_state.flight_info.get('solicitou_reacomodacao', 'Não informado'),
+            'opcao_reacomodacao': st.session_state.flight_info.get('opcao_reacomodacao', 'Não informado'),
+            'recebeu_auxilio': st.session_state.flight_info.get('recebeu_auxilio', 'Não informado'),
+            'auxilio_recebido': st.session_state.flight_info.get('auxilio_recebido', 'Não informado'),
+            'teve_custos': st.session_state.flight_info.get('teve_custos', 'Não informado'),
+            'descricao_custos': st.session_state.flight_info.get('descricao_custos', 'Não informado'),
+            'valor_total_custos': st.session_state.flight_info.get('valor_total_custos', 'Não informado')
+        }
+        
         message_content = f"""
         INFORMAÇÕES DO VOO:
-        - Número do Voo: {st.session_state.flight_info['numero_voo']}
-        - Data do Voo: {st.session_state.flight_info['data_voo']}
-        - Horário Previsto: {st.session_state.flight_info['horario_previsto']}
-        - Horário Real: {st.session_state.flight_info['horario_real']}
-        - Tempo de Atraso: {st.session_state.flight_info['tempo_atraso']}
+        - Número do Voo: {flight_info['numero_voo']}
+        - Data do Voo: {flight_info['data_voo']}
+        - Horário Previsto: {flight_info['horario_previsto']}
+        - Horário Real: {flight_info['horario_real']}
+        - Tempo de Atraso: {flight_info['tempo_atraso']}
         
         DETALHES DO PROBLEMA:
-        - Problema: {st.session_state.flight_info['problema']}
-        - Local do Problema: {st.session_state.flight_info['local_problema']}
-        - Momento da Informação: {st.session_state.flight_info['momento_informacao']}
-        - Compromisso Perdido: {st.session_state.flight_info['compromisso_perdido']}
-        - Contexto do Passageiro: {st.session_state.flight_info['contexto']}
+        - Problema: {flight_info['problema']}
+        - Local do Problema: {flight_info['local_problema']}
+        - Momento da Informação: {flight_info['momento_informacao']}
+        - Compromisso Perdido: {flight_info['compromisso_perdido']}
+        - Contexto do Passageiro: {flight_info['contexto']}
         
         AUXÍLIOS E CUSTOS:
-        - Solicitou Reacomodação: {st.session_state.flight_info['solicitou_reacomodacao']}
-        - Opção Recebida: {st.session_state.flight_info['opcao_reacomodacao']}
-        - Recebeu Auxílio: {st.session_state.flight_info['recebeu_auxilio']}
-        - Auxílio Recebido: {st.session_state.flight_info['auxilio_recebido']}
-        - Teve Custos: {st.session_state.flight_info['teve_custos']}
-        - Descrição dos Custos: {st.session_state.flight_info['descricao_custos']}
-        - Valor Total: {st.session_state.flight_info['valor_total_custos']}
+        - Solicitou Reacomodação: {flight_info['solicitou_reacomodacao']}
+        - Opção Recebida: {flight_info['opcao_reacomodacao']}
+        - Recebeu Auxílio: {flight_info['recebeu_auxilio']}
+        - Auxílio Recebido: {flight_info['auxilio_recebido']}
+        - Teve Custos: {flight_info['teve_custos']}
+        - Descrição dos Custos: {flight_info['descricao_custos']}
+        - Valor Total: {flight_info['valor_total_custos']}
         """
 
         # Criar a mensagem para o assistente
