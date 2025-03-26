@@ -32,136 +32,76 @@ def search_client(search_term, supabase):
         return []
 
 def render_client_section():
-    """Renderiza a seção de seleção de cliente"""
-    st.subheader("1. Dados do Cliente")
+    """Renderiza a seção de seleção do cliente"""
+    st.markdown("### 1. Selecionar Cliente")
     
+    # Inicializar o SupabaseManager
     supabase = SupabaseManager()
     
-    # Campo de busca com autocomplete
-    search_term = st.text_input("Buscar cliente pelo nome")
+    # Campo de busca do cliente
+    search_term = st.text_input("Buscar cliente por nome:")
     
     if search_term:
         clients = search_client(search_term, supabase)
-        
         if clients:
             # Criar lista de opções para o selectbox
-            client_options = {f"{client['nome_completo']} ({client['email']})": client 
-                            for client in clients}
+            client_options = {
+                f"{client['nome_completo']} - {client['cpf']}": client 
+                for client in clients
+            }
             
+            # Dropdown para seleção do cliente
             selected_client = st.selectbox(
-                "Selecione o cliente",
+                "Selecione o cliente:",
                 options=list(client_options.keys()),
                 key="client_select"
             )
             
             if selected_client:
-                # Salvar dados do cliente selecionado na session_state
+                # Salvar dados do cliente selecionado
                 st.session_state.selected_client_data = client_options[selected_client]
                 
-                # Mostrar dados do cliente selecionado em 3 colunas
-                st.write("**Cliente selecionado:**")
-                col1, col2, col3 = st.columns(3)
-                
-                # Distribuir os campos entre as colunas
-                client_data = {k: v for k, v in st.session_state.selected_client_data.items() if k != 'id'}
-                fields = list(client_data.items())
-                
-                # Calcular quantos campos por coluna
-                fields_per_col = len(fields) // 3 + (1 if len(fields) % 3 > 0 else 0)
-                
-                # Preencher as colunas
-                with col1:
-                    for key, value in fields[:fields_per_col]:
-                        st.write(f"{key}: {value}")
-                
-                with col2:
-                    for key, value in fields[fields_per_col:fields_per_col*2]:
-                        st.write(f"{key}: {value}")
-                
-                with col3:
-                    for key, value in fields[fields_per_col*2:]:
-                        st.write(f"{key}: {value}")
-                
-                # Buscar casos do cliente
-                client_cases = supabase.get_client_cases(st.session_state.selected_client_data['id'])
-                
-                if client_cases:
-                    # Criar lista de opções para o selectbox de casos
-                    case_options = {
-                        f"{case.get('chave_caso', 'Sem chave')} - {case.get('assunto_caso', 'Sem assunto')}": case 
-                        for case in client_cases
-                    }
-                    
-                    st.markdown("---")
-                    st.write("**Selecione o caso:**")
-                    
-                    selected_case = st.selectbox(
-                        "Casos do cliente",
-                        options=list(case_options.keys()),
-                        key="case_select"
-                    )
-                    
-                    if selected_case:
-                        # Salvar dados do caso selecionado na session_state
-                        st.session_state.selected_case_data = case_options[selected_case]
-                        
-                        # Mostrar informações do caso
-                        st.write("**Detalhes do caso:**")
-                        case_col1, case_col2 = st.columns(2)
-                        
-                        with case_col1:
-                            st.write(f"**Nome do Cliente:** {st.session_state.selected_case_data.get('nome_cliente', 'Não informado')}")
-                            st.write(f"**Caso:** {st.session_state.selected_case_data.get('caso', 'Não informado')}")
-                            st.write(f"**Assunto:** {st.session_state.selected_case_data.get('assunto_caso', 'Não informado')}")
-                            st.write(f"**Responsável:** {st.session_state.selected_case_data.get('responsavel_comercial', 'Não informado')}")
-                        
-                        with case_col2:
-                            st.write(f"**Chave do Caso:** {st.session_state.selected_case_data.get('chave_caso', 'Não informado')}")
-                            st.write(f"**ID da Pasta:** {st.session_state.selected_case_data.get('pasta_caso_id', 'Não informado')}")
-                            if pasta_url := st.session_state.selected_case_data.get('pasta_caso_url'):
-                                st.write(f"**URL da Pasta:** [Acessar]({pasta_url})")
-                            st.write(f"**Data de Criação:** {st.session_state.selected_case_data.get('created_at', 'Não informado')}")
-                else:
-                    st.info("Nenhum caso encontrado para este cliente")
+                # Mostrar dados do cliente selecionado
+                st.write("**Dados do cliente selecionado:**")
+                for key, value in st.session_state.selected_client_data.items():
+                    st.write(f"**{key}:** {value}")
         else:
-            st.info("Nenhum cliente encontrado")
+            st.info("Nenhum cliente encontrado com esse nome.")
 
 def render_company_section():
-    """Renderiza a seção de seleção da empresa aérea"""
-    st.markdown("---")
-    st.subheader("2. Dados da Empresa Aérea")
+    """Renderiza a seção de seleção da empresa"""
+    st.markdown("### 2. Selecionar Empresa")
     
+    # Inicializar o SupabaseManager
     supabase = SupabaseManager()
     
-    try:
-        # Buscar todas as empresas
-        companies = supabase.get_all_companies()
+    # Buscar todas as empresas
+    companies = supabase.get_all_companies()
+    
+    if companies:
+        # Criar lista de opções para o selectbox
+        company_options = {
+            f"{company['nome']} - {company['cnpj']}": company 
+            for company in companies
+        }
         
-        if companies:
-            # Criar lista de opções para o selectbox
-            company_options = {company['nome']: company for company in companies}
+        # Dropdown para seleção da empresa
+        selected_company = st.selectbox(
+            "Selecione a empresa:",
+            options=list(company_options.keys()),
+            key="company_select"
+        )
+        
+        if selected_company:
+            # Salvar dados da empresa selecionada
+            st.session_state.selected_company_data = company_options[selected_company]
             
-            selected_company = st.selectbox(
-                "Selecione a empresa aérea",
-                options=list(company_options.keys()),
-                key="company_select"
-            )
-            
-            if selected_company:
-                # Salvar dados da empresa selecionada na session_state
-                st.session_state.selected_company_data = company_options[selected_company]
-                
-                # Mostrar dados da empresa selecionada
-                st.write("**Empresa selecionada:**")
-                for key, value in st.session_state.selected_company_data.items():
-                    if key != 'id':
-                        st.write(f"{key}: {value}")
-        else:
-            st.info("Nenhuma empresa cadastrada")
-            
-    except Exception as e:
-        logger.error(f"Erro ao carregar empresas: {str(e)}")
-        st.error("Erro ao carregar lista de empresas")
+            # Mostrar dados da empresa selecionada
+            st.write("**Dados da empresa selecionada:**")
+            for key, value in st.session_state.selected_company_data.items():
+                st.write(f"**{key}:** {value}")
+    else:
+        st.error("Erro ao carregar lista de empresas.")
 
 def get_openai_key():
     """Obtém a chave da API da OpenAI"""
@@ -1141,27 +1081,38 @@ def render_atraso_voo():
     """Renderiza a página de Atraso/Cancelamento de Voo"""
     st.title("Atraso / Cancelamento de Voo")
     
+    # Inicializar dados do caso no session_state
+    if 'selected_case_data' not in st.session_state:
+        st.session_state.selected_case_data = {
+            'assunto_caso': 'Atraso/Cancelamento de Voo',
+            'pasta_caso_id': st.secrets.get("ROOT_FOLDER_ID")  # Usar pasta raiz como fallback
+        }
+    
     # Renderizar cada seção
     render_client_section()
     render_company_section()
-    render_facts_section() 
+    render_facts_section()
 
 def generate_and_save_petition(st_session_state):
-    """
-    Gera e salva a petição preenchida na pasta do caso
-    """
+    """Gera e salva a petição preenchida na pasta do caso"""
     try:
-        # Verificar se temos todos os dados necessários
-        if not all(key in st_session_state for key in ['selected_client_data', 'selected_company_data', 'selected_case_data']):
-            raise Exception("Dados do cliente, empresa ou caso não encontrados")
-
-        # ID do documento template e pasta do caso
-        TEMPLATE_ID = st.secrets["TEMPLATE_ATRASO_VOO_ID"]  # Usar o novo ID específico para atraso de voo
-        pasta_caso_id = st_session_state.selected_case_data.get('pasta_caso_id')
+        # Verificações detalhadas
+        if 'selected_client_data' not in st_session_state:
+            raise Exception("Dados do cliente não encontrados. Por favor, selecione um cliente.")
         
-        if not pasta_caso_id:
-            raise Exception("ID da pasta do caso não encontrado")
+        if 'selected_company_data' not in st_session_state:
+            raise Exception("Dados da empresa não encontrados. Por favor, selecione uma empresa.")
+        
+        if 'selected_case_data' not in st_session_state:
+            raise Exception("Dados do caso não encontrados. Por favor, recarregue a página.")
 
+        # Verificar se temos o ID da pasta
+        pasta_caso_id = st_session_state.selected_case_data.get('pasta_caso_id')
+        if not pasta_caso_id:
+            pasta_caso_id = st.secrets.get("ROOT_FOLDER_ID")  # Usar pasta raiz como fallback
+            if not pasta_caso_id:
+                raise Exception("ID da pasta do caso não encontrado")
+        
         # Criar serviço do Google Drive
         credentials_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
         creds = service_account.Credentials.from_service_account_info(
@@ -1172,7 +1123,7 @@ def generate_and_save_petition(st_session_state):
 
         # Baixar o template (usando get_media para arquivo .docx)
         request = drive_service.files().get_media(
-            fileId=TEMPLATE_ID
+            fileId=st.secrets["TEMPLATE_ATRASO_VOO_ID"]
         )
         
         template_content = io.BytesIO()
