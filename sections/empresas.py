@@ -125,15 +125,26 @@ def render_empresas():
             on_change=lambda: st.session_state.update({'data_editor_changed': True})
         )
 
-        # Add delete buttons in a separate section
-        st.write("### Ações")
-        for idx, row in original_df.iterrows():
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"**{row['nome']}** - {row['cnpj']}")
-            with col2:
-                if st.button("Excluir", key=f"del_{row['id']}", type="primary"):
-                    delete_company(row['id'])
+        # Add delete section with dropdown
+        st.write("### Excluir Empresa")
+        # Create options dictionary with format "Nome - CNPJ": id
+        delete_options = {f"{row['nome']} - {row['cnpj']}": row['id'] for idx, row in original_df.iterrows()}
+        
+        # Add a "Selecione..." option
+        delete_options = {"Selecione...": None, **delete_options}
+        
+        # Create the selectbox
+        selected_company = st.selectbox(
+            "Selecione a empresa para excluir",
+            options=list(delete_options.keys()),
+            key="delete_company_select"
+        )
+        
+        # Add delete button
+        if selected_company != "Selecione..." and st.button("Excluir Empresa", type="primary"):
+            company_id = delete_options[selected_company]
+            if company_id:
+                delete_company(company_id)
         
         # Process any edits
         if st.session_state.get('data_editor_changed', False):
