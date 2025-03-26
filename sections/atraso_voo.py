@@ -8,6 +8,14 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import time
+from num2words import num2words
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+import io
+from docx import Document
+import re
+from pathlib import Path
+from google.oauth2 import service_account
 
 logger = logging.getLogger(__name__)
 
@@ -612,6 +620,8 @@ def render_facts_section():
         if edited_facts != st.session_state.generated_facts:
             st.session_state.generated_facts = edited_facts
             st.info("As alterações foram salvas!")
+
+    st.markdown("---")
     
     # Botões de ação (sempre visíveis)
     st.markdown("### Ações")
@@ -700,127 +710,301 @@ def render_facts_section():
     
     st.markdown("---")
 
-    # Seção de Petição Inicial
-    st.markdown("### Petição Inicial")
-    
-    # 1. Qualificação das Partes
-    st.markdown("#### 1. Qualificação das Partes")
-    
     # Campo para Vara Cível
+    st.markdown("### 4. Vara Cível")
     vara_civil = st.text_input("Vara Cível", key="vara_civil")
+
+    # Seção Jurisprudência Seção Deveres do Transportador
+    st.markdown("### 5. Jurisprudência Seção Deveres do Transportador")
     
-    # Verificar se temos os dados do cliente e da empresa
-    if hasattr(st.session_state, 'selected_client_data') and hasattr(st.session_state, 'selected_company_data'):
-        client_data = st.session_state.selected_client_data
-        company_data = st.session_state.selected_company_data
+    # Adicionar campo de Jurisprudência
+    try:
+        supabase = SupabaseManager()
+        jurisprudencias = supabase.get_jurisprudencias_aereo()
         
-        # Campo de texto para qualificação do cliente
-        client_text = f"""{vara_civil}
+        if jurisprudencias:
+            # Criar dicionário com nome como chave e dados completos como valor
+            jurisprudencia_options = {
+                jurisprudencia['nome']: jurisprudencia 
+                for jurisprudencia in jurisprudencias
+            }
+            
+            # Dropdown para seleção da jurisprudência
+            selected_jurisprudencia = st.selectbox(
+                "Selecione a Jurisprudência - Seção Deveres do Transportador",
+                options=list(jurisprudencia_options.keys()),
+                key="jurisprudencia_select"
+            )
+            
+            if selected_jurisprudencia:
+                # Mostrar detalhes da jurisprudência selecionada
+                jurisprudencia_data = jurisprudencia_options[selected_jurisprudencia]
+                
+                # Salvar no session_state
+                st.session_state['tribunal_jurisprudencia_deveres_transportador'] = jurisprudencia_data['Tribunal']
+                st.session_state['jurisprudencia_deveres_transportador'] = jurisprudencia_data['texto']
+                
+                # Mostrar tribunal e texto um embaixo do outro
+                st.write(f"**Tribunal:** {jurisprudencia_data['Tribunal']}")
+                st.write("**Texto:**")
+                st.markdown(jurisprudencia_data['texto'])
+        else:
+            st.info("Nenhuma jurisprudência encontrada")
+            
+    except Exception as e:
+        logger.error(f"Erro ao carregar jurisprudências: {str(e)}")
+        st.error("Erro ao carregar lista de jurisprudências")
 
-{client_data.get('nome_completo', '')}, \
-{client_data.get('nacionalidade', 'brasileiro(a)')}, \
-{client_data.get('estado_civil', '')}, \
-{client_data.get('profissao', '')}, \
-portador da carteira de identidade nº {client_data.get('rg', '')} \
-expedida pelo {client_data.get('orgao_emissor', '')}, \
-inscrito no CPF nº {client_data.get('cpf', '')}, \
-residente e domiciliado na {client_data.get('endereco', '')}, \
-CEP: {client_data.get('cep', '')}, \
-endereço eletrônico contato@smartlegabr.com, \
-por meio de seus advogados que a esta subscrevem, \
-com escritório na Rua Siqueira Campos, nº 243, salas 703, Copacabana, \
-Rio de Janeiro – RJ, CEP: 22.031-071, onde recebem intimações \
-com fulcro nos arts. 5º, inciso V da Constituição Federal c/c arts. 186 e 927 do Código Civil, \
-vem, respeitosamente propor a presente"""
-
-        st.text_area(
-            "Qualificação Cliente",
-            value=client_text,
-            height=200,
-            key="client_qualification"
-        )
-        
-        # Título da Ação
-        st.markdown("#### AÇÃO INDENIZATÓRIA POR DANOS MORAIS E MATERIAIS")
-        
-        # Campo de texto para qualificação da empresa
-        company_text = f"""em face de {company_data.get('nome', '')}, \
-pessoa jurídica de direito privado, \
-inscrita no CNPJ sob o nº {company_data.get('cnpj', '')}, \
-estabelecida à {company_data.get('endereco', '')}, \
-pelos fatos e fundamentos a seguir expostos."""
-
-        st.text_area(
-            "Qualificação Empresa",
-            value=company_text,
-            height=150,
-            key="company_qualification"
-        )
-        
-        # Título e texto das publicações
-        st.markdown("**DAS PUBLICAÇÕES**")
-        publications_text = """Quanto às publicações, requer seja anotado na capa destes autos o nome do advogado Dr. Marcelo Victor Pereira Nunes Cavalcante, inscrito na OAB/RJ-246336, para recebimento de todas as publicações oficiais, sob pena de nulidade, na forma do §2º do artigo 272 do CPC."""
-        
-        st.text_area(
-            "Das Publicações",
-            value=publications_text,
-            height=150,
-            key="publications_text"
-        )
-    else:
-        st.warning("Por favor, selecione um cliente e uma empresa aérea para gerar a qualificação.")
+    # Seção Jurisprudência Seção Da Inteligência
+    st.markdown("### 6. Jurisprudência Seção Da Inteligência")
     
+    # Adicionar campo de Jurisprudência da Inteligência
+    try:
+        supabase = SupabaseManager()
+        jurisprudencias = supabase.get_jurisprudencias_aereo()
+        
+        if jurisprudencias:
+            # Criar dicionário com nome como chave e dados completos como valor
+            jurisprudencia_options_intel = {
+                jurisprudencia['nome']: jurisprudencia 
+                for jurisprudencia in jurisprudencias
+            }
+            
+            # Dropdown para seleção da jurisprudência
+            selected_jurisprudencia_intel = st.selectbox(
+                "Selecione a Jurisprudência - Seção Da Inteligência",
+                options=list(jurisprudencia_options_intel.keys()),
+                key="jurisprudencia_intel_select"
+            )
+            
+            if selected_jurisprudencia_intel:
+                # Mostrar detalhes da jurisprudência selecionada
+                jurisprudencia_data_intel = jurisprudencia_options_intel[selected_jurisprudencia_intel]
+                
+                # Salvar no session_state
+                st.session_state['tribunal_jurisprudencia_da_inteligencia'] = jurisprudencia_data_intel['Tribunal']
+                st.session_state['jurisprudencia_da_inteligencia'] = jurisprudencia_data_intel['texto']
+                
+                # Mostrar tribunal e texto um embaixo do outro
+                st.write(f"**Tribunal:** {jurisprudencia_data_intel['Tribunal']}")
+                st.write("**Texto:**")
+                st.markdown(jurisprudencia_data_intel['texto'])
+        else:
+            st.info("Nenhuma jurisprudência encontrada")
+            
+    except Exception as e:
+        logger.error(f"Erro ao carregar jurisprudências: {str(e)}")
+        st.error("Erro ao carregar lista de jurisprudências")
+
+    # Seção Jurisprudência Seção Da Responsabilidade
+    st.markdown("### 7. Jurisprudência Seção Da Responsabilidade")
+    
+    # Adicionar campo de Jurisprudência da Responsabilidade
+    try:
+        supabase = SupabaseManager()
+        jurisprudencias = supabase.get_jurisprudencias_aereo()
+        
+        if jurisprudencias:
+            # Criar dicionário com nome como chave e dados completos como valor
+            jurisprudencia_options_resp = {
+                jurisprudencia['nome']: jurisprudencia 
+                for jurisprudencia in jurisprudencias
+            }
+            
+            # Dropdown para seleção da jurisprudência
+            selected_jurisprudencia_resp = st.selectbox(
+                "Selecione a Jurisprudência - Seção Da Responsabilidade",
+                options=list(jurisprudencia_options_resp.keys()),
+                key="jurisprudencia_resp_select"
+            )
+            
+            if selected_jurisprudencia_resp:
+                # Mostrar detalhes da jurisprudência selecionada
+                jurisprudencia_data_resp = jurisprudencia_options_resp[selected_jurisprudencia_resp]
+                
+                # Salvar no session_state
+                st.session_state['tribunal_jurisprudencia_da_responsabilidadea'] = jurisprudencia_data_resp['Tribunal']
+                st.session_state['jurisprudencia_da_responsabilidadea'] = jurisprudencia_data_resp['texto']
+                
+                # Mostrar tribunal e texto um embaixo do outro
+                st.write(f"**Tribunal:** {jurisprudencia_data_resp['Tribunal']}")
+                st.write("**Texto:**")
+                st.markdown(jurisprudencia_data_resp['texto'])
+        else:
+            st.info("Nenhuma jurisprudência encontrada")
+            
+    except Exception as e:
+        logger.error(f"Erro ao carregar jurisprudências: {str(e)}")
+        st.error("Erro ao carregar lista de jurisprudências")
+
     st.markdown("---")
     
-    # Dos Fatos
-    st.markdown("#### 2. Dos Fatos")
-    if 'generated_facts' in st.session_state:
-        st.text_area(
-            "Narrativa dos Fatos",
-            value=st.session_state.generated_facts,
-            height=300,
-            key="narrative_facts"
-        )
+    # Seção Jurisprudência Seção Dos Prejuízos
+    st.markdown("### 8. Jurisprudência Seção Dos Prejuízos")
     
+    # Adicionar campo de Jurisprudência dos Prejuízos
+    try:
+        supabase = SupabaseManager()
+        jurisprudencias = supabase.get_jurisprudencias_aereo()
+        
+        if jurisprudencias:
+            # Criar dicionário com nome como chave e dados completos como valor
+            jurisprudencia_options_prej = {
+                jurisprudencia['nome']: jurisprudencia 
+                for jurisprudencia in jurisprudencias
+            }
+            
+            # Dropdown para seleção da jurisprudência
+            selected_jurisprudencia_prej = st.selectbox(
+                "Selecione a Jurisprudência - Seção Dos Prejuízos",
+                options=list(jurisprudencia_options_prej.keys()),
+                key="jurisprudencia_prej_select"
+            )
+            
+            if selected_jurisprudencia_prej:
+                # Mostrar detalhes da jurisprudência selecionada
+                jurisprudencia_data_prej = jurisprudencia_options_prej[selected_jurisprudencia_prej]
+                
+                # Salvar no session_state
+                st.session_state['tribunal_jurisprudencia_dos_prejuizos'] = jurisprudencia_data_prej['Tribunal']
+                st.session_state['jurisprudencia_dos_prejuizos'] = jurisprudencia_data_prej['texto']
+                
+                # Mostrar tribunal e texto um embaixo do outro
+                st.write(f"**Tribunal:** {jurisprudencia_data_prej['Tribunal']}")
+                st.write("**Texto:**")
+                st.markdown(jurisprudencia_data_prej['texto'])
+        else:
+            st.info("Nenhuma jurisprudência encontrada")
+            
+    except Exception as e:
+        logger.error(f"Erro ao carregar jurisprudências: {str(e)}")
+        st.error("Erro ao carregar lista de jurisprudências")
+
     st.markdown("---")
     
-    # Do Direito
-    st.markdown("#### 3. Do Direito")
+    # Seção Dano Moral e Dano Material
+    st.markdown("### 9. Dano Moral e Dano Material")
     
-    # 3.1 - Título fixo
-    st.markdown("""
-    ##### 3.1 - DOS DEVERES DO TRANSPORTADOR EM DECORRÊNCIA DA FALHA NA PRESTAÇÃO DA INFORMAÇÃO – INOBSERVÂNCIA DO ART. 12 CAPUT DA RESOLUÇÃO Nº 400/2016 DA ANAC.
-    """)
+    # 9.1 - Valor Danos Morais
+    st.markdown("#### 9.1. Valor Danos Morais")
     
-    # Texto editável sobre os deveres do transportador
-    legal_text_1 = st.text_area(
-        "Fundamentação",
-        value="""Consoante o exposto na narrativa dos fatos, observamos o tratamento reprovável que a empresa Ré apresentou ao Autor, se eximindo da responsabilidade de prestar todas as informações concernentes ao voo.
-
-No que tange ao dever do transportador em prestar informações aos consumidores, a resolução nº 400 da ANAC buscou de forma prática amparar o usuário quanto ao seu direito de informação. Conforme aduz o art. 12:
-
-Art. 12. As alterações realizadas de forma programada pelo transportador, em especial quanto ao horário e itinerário originalmente contratados, deverão ser informadas aos passageiros com antecedência mínima de 72 (setenta e duas) horas.
-
-O prazo do transportador aéreo para informar ao consumidor sobre o cancelamento e/ou alteração do voo é de 72 horas, especialmente no que tange ao itinerário e horário.""",
-        height=300,
-        key="legal_text_1"
+    def on_valor_danos_morais_change():
+        """Callback para atualizar os valores formatados quando o input mudar"""
+        valor = st.session_state.valor_danos_morais
+        # Salvar valor formatado
+        st.session_state['valor_dano_moral'] = f"R$ {valor:.2f}"
+        # Converter para extenso
+        try:
+            valor_extenso = num2words(valor, lang='pt_BR', to='currency')
+            valor_extenso = valor_extenso.capitalize()
+            if valor != 1:
+                valor_extenso = valor_extenso.replace(" real", " reais")
+            st.session_state['valor_dano_moral_extenso'] = valor_extenso
+        except Exception as e:
+            logger.error(f"Erro ao converter valor para extenso: {str(e)}")
+    
+    valor_danos_morais = st.number_input(
+        "Valor dos Danos Morais (R$)",
+        min_value=0.0,
+        format="%.2f",
+        step=100.0,
+        key="valor_danos_morais",
+        on_change=on_valor_danos_morais_change  # Adicionar callback
     )
     
-    # Separador para a próxima subseção
+    # Mostrar valor por extenso se disponível
+    if 'valor_dano_moral_extenso' in st.session_state:
+        st.write(f"**Valor por extenso:** {st.session_state.valor_dano_moral_extenso}")
+    
+    # 9.2 - Motivos Danos Morais
+    st.markdown("#### 9.2. Motivos Danos Morais")
+    motivos_exemplo = """- O cancelamento do voo do Autor pela empresa Ré após longa jornada no aeroporto;
+
+- A recusa da empresa Ré em reacomodar o Autor em um voo que tivesse o horário de partida próximo ao anterior, realocando o autor para um voo só no dia seguinte, fazendo ele chegar ao destino final 15 horas depois do previsto; 
+
+- O atraso substancial de 15 horas na sua viagem;
+
+- A falta de prestação de assistência material pela Empresa Ré ao Autor."""
+
+    motivos_danos_morais = st.text_area(
+        "Motivos dos Danos Morais",
+        value=motivos_exemplo,
+        height=300,
+        key="motivos_danos_morais"
+    )
+    
+    # 9.3 - Danos Materiais
+    st.markdown("#### 9.3. Danos Materiais (já preenchido na seção 3)")
+    
+    # Obter o valor dos custos da seção 3
+    valor_danos_materiais = 0.0
+    if hasattr(st.session_state, 'flight_info'):
+        valor_str = st.session_state.flight_info.get('valor_total_custos', '0')
+        # Remover 'R$' e outros caracteres não numéricos, exceto ponto e vírgula
+        valor_str = ''.join(c for c in valor_str if c.isdigit() or c in '.,')
+        try:
+            # Substituir vírgula por ponto e converter para float
+            valor_danos_materiais = float(valor_str.replace(',', '.'))
+        except:
+            valor_danos_materiais = 0.0
+    
+    st.write(f"**Valor dos Danos Materiais:** R$ {valor_danos_materiais:.2f}")
+    
+    # Converter o valor para extenso
+    try:
+        valor_materiais_extenso = num2words(valor_danos_materiais, lang='pt_BR', to='currency')
+        valor_materiais_extenso = valor_materiais_extenso.capitalize()
+        if valor_danos_materiais != 1:
+            valor_materiais_extenso = valor_materiais_extenso.replace(" real", " reais")
+        st.session_state['valor_danos_material_extenso'] = valor_materiais_extenso  # Salvar no session_state
+        st.write(f"**Valor por extenso:** {valor_materiais_extenso}")
+    except Exception as e:
+        logger.error(f"Erro ao converter valor material para extenso: {str(e)}")
+        st.error("Erro ao converter valor material para extenso")
+    
+    # 9.4 - Valor Total da Causa
+    st.markdown("#### 9.4. Valor Total da Causa")
+    
+    # Calcular valor total (danos materiais + morais)
+    valor_total_causa = valor_danos_materiais + valor_danos_morais
+    
+    st.write(f"**Valor Total da Causa:** R$ {valor_total_causa:.2f}")
+    
+    # Converter o valor total para extenso
+    try:
+        valor_total_extenso = num2words(valor_total_causa, lang='pt_BR', to='currency')
+        valor_total_extenso = valor_total_extenso.capitalize()
+        if valor_total_causa != 1:
+            valor_total_extenso = valor_total_extenso.replace(" real", " reais")
+        st.session_state['valor_dano_moral_material_extenso'] = valor_total_extenso  # Salvar no session_state
+        st.session_state['valor_dano_moral_material'] = f"R$ {valor_total_causa:.2f}"  # Salvar valor formatado
+        st.write(f"**Valor por extenso:** {valor_total_extenso}")
+    except Exception as e:
+        logger.error(f"Erro ao converter valor total para extenso: {str(e)}")
+        st.error("Erro ao converter valor total para extenso")
+    
     st.markdown("---")
     
-    # Dos Pedidos
-    st.markdown("#### 4. Dos Pedidos")
-    if st.button("Gerar Pedidos", type="primary", use_container_width=True):
-        st.info("Em desenvolvimento: Geração automática dos pedidos")
+    # Seção 10. Data
+    st.markdown("### 10. Data")
     
-    # Campo para exibir/editar os pedidos
-    st.text_area(
-        "Pedidos",
-        value="",  # Aqui virá o texto gerado pelo assistant
-        height=300,
-        key="requests"
-    )
+    # Obter data atual
+    data_atual = datetime.now()
+    
+    # Formato DD-MM-YYYY
+    data_formatada = data_atual.strftime("%d-%m-%Y")
+    st.write(f"**Data:** {data_formatada}")
+    
+    # Formato por extenso (25 de março de 2025)
+    meses = {
+        1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril',
+        5: 'maio', 6: 'junho', 7: 'julho', 8: 'agosto',
+        9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'
+    }
+    
+    data_extenso = f"{data_atual.day} de {meses[data_atual.month]} de {data_atual.year}"
+    st.write(f"**Data por extenso:** {data_extenso}")
+    st.session_state['data_extenso'] = data_extenso  # Salvar no session_state
     
     st.markdown("---")
     
@@ -828,7 +1012,59 @@ O prazo do transportador aéreo para informar ao consumidor sobre o cancelamento
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("Gerar Petição Completa", type="primary", use_container_width=True):
-            st.info("Em desenvolvimento: Geração da petição inicial completa")
+            try:
+                with st.spinner("Gerando petição inicial..."):
+                    doc_link = generate_and_save_petition(st.session_state)
+                    st.success("Petição gerada com sucesso!")
+                    st.markdown(f"[Clique aqui para visualizar a petição]({doc_link})")
+            except Exception as e:
+                st.error(f"Erro ao gerar petição: {str(e)}")
+    
+    # Seção de verificação dos campos
+    if st.checkbox("Mostrar dados que serão usados na petição"):
+        st.markdown("### Verificação dos Dados da Petição")
+        
+        # Criar um dicionário com todos os campos
+        campos = {
+            'nome_completo': st.session_state.selected_client_data.get('nome_completo', ''),
+            'nacionalidade': st.session_state.selected_client_data.get('nacionalidade', ''),
+            'estado_civil': st.session_state.selected_client_data.get('estado_civil', ''),
+            'profissao': st.session_state.selected_client_data.get('profissao', ''),
+            'rg': st.session_state.selected_client_data.get('rg', ''),
+            'cpf': st.session_state.selected_client_data.get('cpf', ''),
+            'endereco': st.session_state.selected_client_data.get('endereco', ''),
+            'bairro': st.session_state.selected_client_data.get('bairro', ''),
+            'cidade': st.session_state.selected_client_data.get('cidade', ''),
+            'cep': st.session_state.selected_client_data.get('cep', ''),
+            'nome_empresa_re': st.session_state.selected_company_data.get('nome', ''),
+            'cnpj_empresa_re': st.session_state.selected_company_data.get('cnpj', ''),
+            'endereco_empresa_re': st.session_state.selected_company_data.get('endereco', ''),
+            'dos_fatos': st.session_state.get('generated_facts', ''),
+            'tempo_atraso': st.session_state.flight_info.get('tempo_atraso', ''),
+            'valor_danos_material': st.session_state.flight_info.get('valor_total_custos', ''),
+            'valor_danos_material_extenso': st.session_state.get('valor_danos_material_extenso', ''),
+            'explicacao_danos_material': st.session_state.flight_info.get('descricao_custos', ''),
+            'vara_civil': st.session_state.get('vara_civil', ''),
+            'tribunal_jurisprudencia_deveres_transportador': st.session_state.get('tribunal_jurisprudencia_deveres_transportador', ''),
+            'jurisprudencia_deveres_transportador': st.session_state.get('jurisprudencia_deveres_transportador', ''),
+            'tribunal_jurisprudencia_da_inteligencia': st.session_state.get('tribunal_jurisprudencia_da_inteligencia', ''),
+            'jurisprudencia_da_inteligencia': st.session_state.get('jurisprudencia_da_inteligencia', ''),
+            'tribunal_jurisprudencia_da_responsabilidadea': st.session_state.get('tribunal_jurisprudencia_da_responsabilidadea', ''),
+            'jurisprudencia_da_responsabilidadea': st.session_state.get('jurisprudencia_da_responsabilidadea', ''),
+            'tribunal_jurisprudencia_dos_prejuizos': st.session_state.get('tribunal_jurisprudencia_dos_prejuizos', ''),
+            'jurisprudencia_dos_prejuizos': st.session_state.get('jurisprudencia_dos_prejuizos', ''),
+            'motivos_danos_moral': st.session_state.get('motivos_danos_morais', ''),
+            'valor_dano_moral': st.session_state.get('valor_dano_moral', ''),
+            'valor_dano_moral_extenso': st.session_state.get('valor_dano_moral_extenso', ''),
+            'valor_dano_moral_material': st.session_state.get('valor_dano_moral_material', ''),
+            'valor_dano_moral_material_extenso': st.session_state.get('valor_dano_moral_material_extenso', ''),
+            'data_extenso': st.session_state.get('data_extenso', '')
+        }
+        
+        # Mostrar cada campo em um expander
+        for key, value in campos.items():
+            with st.expander(f"{{{{ {key} }}}}"):
+                st.write(value)
     
     st.markdown("---")
 
@@ -923,3 +1159,118 @@ def render_atraso_voo():
     render_client_section()
     render_company_section()
     render_facts_section() 
+
+def generate_and_save_petition(st_session_state):
+    """
+    Gera e salva a petição preenchida na pasta do caso
+    """
+    try:
+        # Verificar se temos todos os dados necessários
+        if not all(key in st_session_state for key in ['selected_client_data', 'selected_company_data', 'selected_case_data']):
+            raise Exception("Dados do cliente, empresa ou caso não encontrados")
+
+        # ID do documento template e pasta do caso
+        TEMPLATE_ID = st.secrets["TEMPLATE_ATRASO_VOO_ID"]  # Usar o novo ID específico para atraso de voo
+        pasta_caso_id = st_session_state.selected_case_data.get('pasta_caso_id')
+        
+        if not pasta_caso_id:
+            raise Exception("ID da pasta do caso não encontrado")
+
+        # Criar serviço do Google Drive
+        credentials_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+        creds = service_account.Credentials.from_service_account_info(
+            credentials_dict,
+            scopes=['https://www.googleapis.com/auth/drive']  # Escopo completo do Drive
+        )
+        drive_service = build('drive', 'v3', credentials=creds)
+
+        # Baixar o template (usando get_media para arquivo .docx)
+        request = drive_service.files().get_media(
+            fileId=TEMPLATE_ID
+        )
+        
+        template_content = io.BytesIO()
+        downloader = MediaIoBaseDownload(template_content, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+
+        # Carregar o documento com python-docx
+        doc = Document(template_content)
+
+        # Preparar os dados para substituição
+        replace_dict = {
+            'nome_completo': st_session_state.selected_client_data.get('nome_completo', ''),
+            'nacionalidade': st_session_state.selected_client_data.get('nacionalidade', ''),
+            'estado_civil': st_session_state.selected_client_data.get('estado_civil', ''),
+            'profissao': st_session_state.selected_client_data.get('profissao', ''),
+            'rg': st_session_state.selected_client_data.get('rg', ''),
+            'cpf': st_session_state.selected_client_data.get('cpf', ''),
+            'endereco': st_session_state.selected_client_data.get('endereco', ''),
+            'bairro': st_session_state.selected_client_data.get('bairro', ''),
+            'cidade': st_session_state.selected_client_data.get('cidade', ''),
+            'cep': st_session_state.selected_client_data.get('cep', ''),
+            'nome_empresa_re': st_session_state.selected_company_data.get('nome', ''),
+            'cnpj_empresa_re': st_session_state.selected_company_data.get('cnpj', ''),
+            'endereco_empresa_re': st_session_state.selected_company_data.get('endereco', ''),
+            'dos_fatos': st_session_state.get('generated_facts', ''),
+            'tempo_atraso': st_session_state.flight_info.get('tempo_atraso', ''),
+            'valor_danos_material': st_session_state.flight_info.get('valor_total_custos', ''),
+            'valor_danos_material_extenso': st_session_state.get('valor_danos_material_extenso', ''),
+            'explicacao_danos_material': st_session_state.flight_info.get('descricao_custos', ''),
+            'vara_civil': st_session_state.get('vara_civil', ''),
+            'tribunal_jurisprudencia_deveres_transportador': st_session_state.get('tribunal_jurisprudencia_deveres_transportador', ''),
+            'jurisprudencia_deveres_transportador': st_session_state.get('jurisprudencia_deveres_transportador', ''),
+            'tribunal_jurisprudencia_da_inteligencia': st_session_state.get('tribunal_jurisprudencia_da_inteligencia', ''),
+            'jurisprudencia_da_inteligencia': st_session_state.get('jurisprudencia_da_inteligencia', ''),
+            'tribunal_jurisprudencia_da_responsabilidadea': st_session_state.get('tribunal_jurisprudencia_da_responsabilidadea', ''),
+            'jurisprudencia_da_responsabilidadea': st_session_state.get('jurisprudencia_da_responsabilidadea', ''),
+            'tribunal_jurisprudencia_dos_prejuizos': st_session_state.get('tribunal_jurisprudencia_dos_prejuizos', ''),
+            'jurisprudencia_dos_prejuizos': st_session_state.get('jurisprudencia_dos_prejuizos', ''),
+            'motivos_danos_moral': st_session_state.get('motivos_danos_morais', ''),
+            'valor_dano_moral': st_session_state.get('valor_dano_moral', ''),
+            'valor_dano_moral_extenso': st_session_state.get('valor_dano_moral_extenso', ''),
+            'valor_dano_moral_material': st_session_state.get('valor_dano_moral_material', ''),
+            'valor_dano_moral_material_extenso': st_session_state.get('valor_dano_moral_material_extenso', ''),
+            'data_extenso': st_session_state.get('data_extenso', '')
+        }
+
+        # Substituir os placeholders no documento
+        for paragraph in doc.paragraphs:
+            for key, value in replace_dict.items():
+                if f'{{{{{key}}}}}' in paragraph.text:
+                    paragraph.text = paragraph.text.replace(f'{{{{{key}}}}}', str(value))
+
+        # Salvar o documento modificado
+        output = io.BytesIO()
+        doc.save(output)
+        output.seek(0)
+
+        # Nome do arquivo com data e hora
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_name = f"Petição Inicial - {timestamp}.docx"
+
+        # Criar arquivo no Google Drive
+        file_metadata = {
+            'name': file_name,
+            'parents': [pasta_caso_id],
+            'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        }
+        
+        media = MediaIoBaseUpload(
+            output, 
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            resumable=True
+        )
+        
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink'
+        ).execute()
+
+        return file.get('webViewLink')
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar petição: {str(e)}")
+        raise Exception(f"Erro ao gerar petição: {str(e)}") 

@@ -308,6 +308,82 @@ class SupabaseManager:
             logger.error(f"Erro ao salvar fatos para treinamento: {str(e)}")
             raise Exception(f"Erro ao salvar para treinamento: {str(e)}")
 
+    def get_all_jurisprudencias(self):
+        """Busca todas as jurisprudências do banco de dados"""
+        try:
+            print("Tentando buscar jurisprudências...")  # Debug
+            response = self.supabase.table('jurisprudenciaAereo').select('id, nome, texto, secao, "Tribunal", created_at').order('created_at', desc=True).execute()
+            
+            if not response:
+                print("Resposta vazia do Supabase")  # Debug
+                return []
+                
+            print(f"Dados recebidos: {response.data}")  # Debug
+            
+            if not response.data:
+                print("response.data está vazio")  # Debug
+                return []
+                
+            return response.data
+            
+        except Exception as e:
+            print(f"Erro detalhado ao buscar jurisprudências: {str(e)}")  # Debug
+            logger.error(f"Erro ao buscar jurisprudências: {str(e)}")
+            raise e
+
+    def add_jurisprudencia(self, jurisprudencia_data):
+        """Adiciona uma nova jurisprudência ao banco de dados
+        
+        Args:
+            jurisprudencia_data: Dicionário contendo os dados da jurisprudência
+        """
+        try:
+            # Garantir que o campo Tribunal está presente (com T maiúsculo)
+            if 'Tribunal' not in jurisprudencia_data:
+                jurisprudencia_data['Tribunal'] = ''  # ou outro valor padrão
+            
+            response = self.supabase.table('jurisprudenciaAereo').insert(jurisprudencia_data).execute()
+            return response.data
+        except Exception as e:
+            print(f"Erro ao adicionar jurisprudência: {str(e)}")
+            raise e
+
+    def update_jurisprudencia(self, jurisprudencia_id, data):
+        """Atualiza uma jurisprudência no banco de dados
+        
+        Args:
+            jurisprudencia_id: ID da jurisprudência a ser atualizada
+            data: Dicionário contendo os campos a serem atualizados
+        """
+        try:
+            response = self.supabase.table('jurisprudenciaAereo').update(data).eq('id', jurisprudencia_id).execute()
+            return response.data
+        except Exception as e:
+            print(f"Erro ao atualizar jurisprudência: {str(e)}")
+            raise e
+
+    def delete_jurisprudencia(self, jurisprudencia_id):
+        """Deleta uma jurisprudência do banco de dados
+        
+        Args:
+            jurisprudencia_id: ID da jurisprudência a ser deletada
+        """
+        try:
+            response = self.supabase.table('jurisprudenciaAereo').delete().eq('id', jurisprudencia_id).execute()
+            return response.data
+        except Exception as e:
+            print(f"Erro ao deletar jurisprudência: {str(e)}")
+            raise e
+
+    def get_jurisprudencias_aereo(self):
+        """Busca todas as jurisprudências da tabela jurisprudenciaAereo"""
+        try:
+            response = self.supabase.table('jurisprudenciaAereo').select('*').execute()
+            return response.data
+        except Exception as e:
+            logger.error(f"Erro ao buscar jurisprudências: {str(e)}")
+            raise Exception(f"Erro ao buscar jurisprudências: {str(e)}")
+
 def init_supabase() -> Client:
     """Inicializa o cliente Supabase"""
     try:
