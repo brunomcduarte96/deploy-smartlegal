@@ -73,14 +73,14 @@ def render_jurisprudencias():
     """Render the jurisprudencias page"""
     st.title("Jurisprudências")
     
-    # Add buttons in columns
-    col1, col2 = st.columns(2)
+    # Add buttons in columns with better proportions
+    col1, col2, col3 = st.columns([1.5, 1.5, 7])
     with col1:
-        if st.button("+ Adicionar Nova Jurisprudência"):
+        if st.button("+ Adicionar Nova Jurisprudência", use_container_width=True):
             st.session_state.show_add_jurisprudencia = True
             st.session_state.show_delete_jurisprudencia = False
     with col2:
-        if st.button("- Excluir Jurisprudência"):
+        if st.button("- Excluir Jurisprudência", use_container_width=True):
             st.session_state.show_delete_jurisprudencia = True
             st.session_state.show_add_jurisprudencia = False
     

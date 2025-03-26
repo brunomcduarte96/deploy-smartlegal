@@ -85,14 +85,14 @@ def render_empresas():
     """Render the empresas page"""
     st.title("Gestão de Empresas")
     
-    # Add buttons in columns
-    col1, col2 = st.columns(2)
+    # Add buttons in columns with better proportions
+    col1, col2, col3 = st.columns([1.5, 1.5, 7])
     with col1:
-        if st.button("+ Adicionar Nova Empresa"):
+        if st.button("+ Adicionar Nova Empresa", use_container_width=True):
             st.session_state.show_add_company = True
             st.session_state.show_delete_company = False
     with col2:
-        if st.button("- Excluir Empresa"):
+        if st.button("- Excluir Empresa", use_container_width=True):
             st.session_state.show_delete_company = True
             st.session_state.show_add_company = False
     
