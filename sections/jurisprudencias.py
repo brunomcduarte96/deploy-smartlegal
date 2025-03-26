@@ -93,7 +93,7 @@ def render_jurisprudencias():
         original_df = df.copy()
         
         # Reorder columns
-        columns_order = ['id', 'created_at', 'nome', 'texto', 'secao', 'Tribunal']
+        columns_order = ['id', 'created_at', 'nome', 'secao', 'Tribunal', 'texto']
         df = df.reindex(columns=columns_order)
         
         # Rename columns
@@ -111,7 +111,7 @@ def render_jurisprudencias():
         df = df.sort_values('Seção')
         
         # Get visible columns (excluding 'ID')
-        visible_columns = [col for col in df.columns if col != 'ID']
+        visible_columns = ['Data de Criação', 'Nome', 'Seção', 'Tribunal', 'Texto']
         
         # Display editable table
         edited_df = st.data_editor(
