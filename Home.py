@@ -32,6 +32,10 @@ def render_sidebar():
     if st.sidebar.button("Clientes", use_container_width=True):
         st.session_state.current_page = "clientes"
         st.rerun()
+    
+    if st.sidebar.button("Gerar Documentos", use_container_width=True):
+        st.session_state.current_page = "gerar_documentos"
+        st.rerun()
         
     st.sidebar.divider()  # Separador
     
@@ -99,6 +103,8 @@ def main():
         render_jurisprudencias()
     elif st.session_state.current_page == "empresas":
         render_empresas()
+    elif st.session_state.current_page == "gerar_documentos":
+        st.info("Página em desenvolvimento")  # Placeholder até implementarmos
 
 if __name__ == "__main__":
     st.set_page_config(
