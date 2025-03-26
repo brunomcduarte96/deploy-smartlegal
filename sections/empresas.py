@@ -114,7 +114,7 @@ def render_empresas():
         original_df = df.copy()
         
         # Get visible columns (excluding 'id')
-        visible_columns = ['nome', 'cnpj', 'endereco', 'Ações']
+        visible_columns = ['nome', 'cnpj', 'endereco']
         
         # Display editable table
         edited_df = st.data_editor(
@@ -122,19 +122,20 @@ def render_empresas():
             hide_index=True,
             column_order=visible_columns,
             key="company_editor",
-            column_config={
-                "Ações": st.column_config.ButtonColumn(
-                    "Ações",
-                    help="Ações disponíveis",
-                    default=False,
-                    label="Excluir",
-                    width="small"
-                )
-            },
             on_change=lambda: st.session_state.update({'data_editor_changed': True})
         )
+
+        # Add delete buttons in a separate section
+        st.write("### Ações")
+        for idx, row in original_df.iterrows():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{row['nome']}** - {row['cnpj']}")
+            with col2:
+                if st.button("Excluir", key=f"del_{row['id']}", type="primary"):
+                    delete_company(row['id'])
         
-        # Handle both edits and deletes
+        # Process any edits
         if st.session_state.get('data_editor_changed', False):
             edited_rows = {}
             

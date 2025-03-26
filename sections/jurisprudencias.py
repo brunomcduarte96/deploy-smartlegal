@@ -102,11 +102,8 @@ def render_jurisprudencias():
         # Create a copy of original data for comparison
         original_df = df.copy()
         
-        # Add delete button column
-        df['Ações'] = None
-        
-        # Reorder columns
-        columns_order = ['id', 'created_at', 'nome', 'secao', 'Tribunal', 'texto', 'Ações']
+        # Reorder columns (remove Ações since we'll add buttons separately)
+        columns_order = ['id', 'created_at', 'nome', 'secao', 'Tribunal', 'texto']
         df = df.reindex(columns=columns_order)
         
         # Rename columns
@@ -116,8 +113,7 @@ def render_jurisprudencias():
             'nome': 'Nome',
             'texto': 'Texto',
             'secao': 'Seção',
-            'Tribunal': 'Tribunal',
-            'Ações': 'Ações'
+            'Tribunal': 'Tribunal'
         }
         df = df.rename(columns=column_names)
         
@@ -125,7 +121,7 @@ def render_jurisprudencias():
         df = df.sort_values('Seção')
         
         # Get visible columns (excluding 'ID')
-        visible_columns = ['Data de Criação', 'Nome', 'Seção', 'Tribunal', 'Texto', 'Ações']
+        visible_columns = ['Data de Criação', 'Nome', 'Seção', 'Tribunal', 'Texto']
         
         # Display editable table
         edited_df = st.data_editor(
@@ -133,24 +129,19 @@ def render_jurisprudencias():
             hide_index=True,
             column_order=visible_columns,
             key="jurisprudencia_editor",
-            disabled=['ID', 'Data de Criação', 'Ações'],
-            column_config={
-                "Ações": st.column_config.ButtonColumn(
-                    "Ações",
-                    help="Ações disponíveis",
-                    default=False,
-                    label="Excluir",
-                    width="small"
-                )
-            },
+            disabled=['ID', 'Data de Criação'],
             on_change=lambda: st.session_state.update({'data_editor_changed': True})
         )
-        
-        # Handle delete actions
-        for idx, row in edited_df.iterrows():
-            if row['Ações']:  # If delete button was clicked
-                jurisprudencia_id = original_df.iloc[idx]['id']
-                delete_jurisprudencia(jurisprudencia_id)
+
+        # Add delete buttons in a separate section
+        st.write("### Ações")
+        for idx, row in original_df.iterrows():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{row['nome']}** - {row['secao']}")
+            with col2:
+                if st.button("Excluir", key=f"del_{row['id']}", type="primary"):
+                    delete_jurisprudencia(row['id'])
         
         # Process any edits
         if st.session_state.get('data_editor_changed', False):
