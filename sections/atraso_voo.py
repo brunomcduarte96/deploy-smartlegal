@@ -254,86 +254,51 @@ def extract_flight_info(fatos_cliente):
         logger.error(f"Erro ao processar texto com OpenAI: {str(e)}")
         raise e
 
-def generate_facts_with_assistant(flight_info, fatos_cliente):
-    """Gera os fatos formatados usando o OpenAI Assistant específico"""
+def generate_facts():
+    """Gera os fatos usando a API da OpenAI"""
     try:
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        client = OpenAI()
+        # Adicionar o cabeçalho beta para v2
+        client.headers["OpenAI-Beta"] = "assistants=v2"
         
-        # Usar o assistant específico
-        assistant_id = "asst_Yjlfjp23PwM2qiN6ckjxUspB"
-        
-        # Criar um thread
-        thread = client.beta.threads.create()
-        
-        # Preparar as informações do voo em um formato mais legível
         message_content = f"""
-        FATOS RELATADOS PELO CLIENTE:
-        {fatos_cliente}
-        
-        DADOS COMPLEMENTARES DO VOO:
-        
-        DADOS DO VOO:
-        - Tipo: {flight_info['tipo_voo']}
-        - Origem: {flight_info['origem_voo']}
-        - Destino: {flight_info['destino_voo']}
-        - Escala: {flight_info['escala']}
-        - Data Prevista: {flight_info['data_voo_inicial']}
-        - Horário Previsto: {flight_info['horario_voo_inicial']}
-        - Data Real: {flight_info['data_voo_real']}
-        - Horário Real: {flight_info['horario_voo_real']}
-        - Tempo de Atraso: {flight_info['tempo_atraso']}
+        INFORMAÇÕES DO VOO:
+        - Número do Voo: {st.session_state.flight_info['numero_voo']}
+        - Data do Voo: {st.session_state.flight_info['data_voo']}
+        - Horário Previsto: {st.session_state.flight_info['horario_previsto']}
+        - Horário Real: {st.session_state.flight_info['horario_real']}
+        - Tempo de Atraso: {st.session_state.flight_info['tempo_atraso']}
         
         DETALHES DO PROBLEMA:
-        - Motivo da Viagem: {flight_info['motivo_voo']}
-        - Problema: {flight_info['problema']}
-        - Local do Problema: {flight_info['local_problema']}
-        - Momento da Informação: {flight_info['momento_informacao']}
-        - Compromisso Perdido: {flight_info['compromisso_perdido']}
-        - Contexto do Passageiro: {flight_info['contexto']}
+        - Problema: {st.session_state.flight_info['problema']}
+        - Local do Problema: {st.session_state.flight_info['local_problema']}
+        - Momento da Informação: {st.session_state.flight_info['momento_informacao']}
+        - Compromisso Perdido: {st.session_state.flight_info['compromisso_perdido']}
+        - Contexto do Passageiro: {st.session_state.flight_info['contexto']}
         
         AUXÍLIOS E CUSTOS:
-        - Solicitou Reacomodação: {flight_info['solicitou_reacomodacao']}
-        - Opção Recebida: {flight_info['opcao_reacomodacao']}
-        - Recebeu Auxílio: {flight_info['recebeu_auxilio']}
-        - Auxílio Recebido: {flight_info['auxilio_recebido']}
-        - Teve Custos: {flight_info['teve_custos']}
-        - Descrição dos Custos: {flight_info['descricao_custos']}
-        - Valor Total: {flight_info['valor_total_custos']}
+        - Solicitou Reacomodação: {st.session_state.flight_info['solicitou_reacomodacao']}
+        - Opção Recebida: {st.session_state.flight_info['opcao_reacomodacao']}
+        - Recebeu Auxílio: {st.session_state.flight_info['recebeu_auxilio']}
+        - Auxílio Recebido: {st.session_state.flight_info['auxilio_recebido']}
+        - Teve Custos: {st.session_state.flight_info['teve_custos']}
+        - Descrição dos Custos: {st.session_state.flight_info['descricao_custos']}
+        - Valor Total: {st.session_state.flight_info['valor_total_custos']}
         """
-        
-        # Adicionar a mensagem ao thread
-        message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=message_content
+
+        # Criar a mensagem para o assistente
+        response = client.chat.completions.create(
+            model="gpt-4-1106-preview",  # ou outro modelo compatível
+            messages=[
+                {"role": "system", "content": "Você é um assistente jurídico especializado em gerar narrativas dos fatos para petições iniciais de casos de atraso ou cancelamento de voo."},
+                {"role": "user", "content": message_content}
+            ]
         )
-        
-        # Executar o assistant
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant_id
-        )
-        
-        # Aguardar a conclusão
-        while True:
-            run_status = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            if run_status.status == 'completed':
-                break
-            elif run_status.status == 'failed':
-                raise Exception("O assistente falhou ao processar a solicitação")
-            elif run_status.status == 'expired':
-                raise Exception("A solicitação expirou")
-            time.sleep(1)
-        
-        # Obter a resposta
-        messages = client.beta.threads.messages.list(thread_id=thread.id)
-        response = messages.data[0].content[0].text.value
-        
-        return response
-        
+
+        # Extrair e retornar o texto gerado
+        generated_facts = response.choices[0].message.content
+        return generated_facts
+
     except Exception as e:
         logger.error(f"Erro ao gerar fatos: {str(e)}")
         raise Exception(f"Erro ao gerar fatos: {str(e)}")
@@ -594,10 +559,7 @@ def render_facts_section():
             
         try:
             with st.spinner("Gerando fatos do caso..."):
-                generated_facts = generate_facts_with_assistant(
-                    st.session_state.flight_info,
-                    fatos_cliente
-                )
+                generated_facts = generate_facts()
                 st.session_state.generated_facts = generated_facts
                 st.success("Fatos gerados com sucesso!")
         except Exception as e:
@@ -641,10 +603,7 @@ def render_facts_section():
             
             try:
                 with st.spinner("Gerando novos fatos..."):
-                    generated_facts = generate_facts_with_assistant(
-                        st.session_state.flight_info,
-                        fatos_cliente
-                    )
+                    generated_facts = generate_facts()
                     st.session_state.generated_facts = generated_facts
                     st.rerun()
             except Exception as e:
