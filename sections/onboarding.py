@@ -10,6 +10,7 @@ from utils.error_handler import handle_error
 import logging
 from utils.date_utils import data_por_extenso
 from utils.text_utils import format_title_case
+import locale
 
 # Definir timezone de São Paulo
 SP_TZ = pytz.timezone('America/Sao_Paulo')
@@ -402,6 +403,17 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
                     return
                 
                 try:
+                    # Verificar se o CPF já existe
+                    existing_client = supabase_manager.get_client_by_cpf(cpf)
+                    if existing_client:
+                        st.error(f"""
+                            CPF já cadastrado para o cliente: {existing_client['nome_completo']}
+                            
+                            Se você deseja adicionar um novo caso para este cliente, 
+                            por favor use a busca de clientes na tela inicial.
+                        """)
+                        return
+                    
                     # Criar barra de progresso
                     progress_bar = st.progress(0)
                     status_text = st.empty()
@@ -542,12 +554,50 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
                     st.success("Cliente e caso cadastrados com sucesso!")
                     
                 except Exception as e:
-                    logger.error(f"Erro durante o cadastro: {str(e)}")
-                    st.error(f"Erro durante o cadastro: {str(e)}")
+                    if "duplicate key value" in str(e) and "clientes_cpf_key" in str(e):
+                        st.error("""
+                            Este CPF já está cadastrado. 
+                            Se você deseja adicionar um novo caso para este cliente,
+                            por favor use a busca de clientes na tela inicial.
+                        """)
+                    else:
+                        logger.error(f"Erro durante o cadastro: {str(e)}")
+                        st.error(f"Erro durante o cadastro: {str(e)}")
                     
         except Exception as e:
             logger.error(f"Erro ao renderizar formulário: {str(e)}")
             st.error(f"Erro ao renderizar formulário: {str(e)}")
+
+def data_por_extenso(data):
+    """Formata a data por extenso manualmente"""
+    try:
+        # Tentar configurar o locale para português
+        try:
+            locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+        except:
+            try:
+                locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+            except:
+                # Se não conseguir configurar o locale, usar formato manual
+                meses = {
+                    1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril',
+                    5: 'maio', 6: 'junho', 7: 'julho', 8: 'agosto',
+                    9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'
+                }
+                
+                dia = str(data.day)
+                mes = meses[data.month]
+                ano = str(data.year)
+                
+                return f"{dia} de {mes} de {ano}"
+                
+        # Se conseguiu configurar o locale, usar strftime
+        return data.strftime("%d de %B de %Y")
+        
+    except Exception as e:
+        logger.error(f"Erro ao formatar data por extenso: {str(e)}")
+        # Retornar formato básico em caso de erro
+        return data.strftime("%d/%m/%Y")
 
 if __name__ == "__main__":
     if not check_authentication(init_managers()[0].supabase):

@@ -384,6 +384,17 @@ class SupabaseManager:
             logger.error(f"Erro ao buscar jurisprudências: {str(e)}")
             raise Exception(f"Erro ao buscar jurisprudências: {str(e)}")
 
+    def get_client_by_cpf(self, cpf):
+        """Busca um cliente pelo CPF"""
+        try:
+            response = self.supabase.table('clientes').select('*').eq('cpf', cpf).execute()
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return None
+        except Exception as e:
+            logger.error(f"Erro ao buscar cliente por CPF: {str(e)}")
+            return None
+
 def init_supabase() -> Client:
     """Inicializa o cliente Supabase"""
     try:

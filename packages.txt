@@ -7,4 +7,5 @@ libpng-dev
 libtiff-dev
 poppler-utils
 ffmpeg
-libavcodec-extra 
+libavcodec-extra
+locales 
