@@ -85,14 +85,16 @@ def render_empresas():
     """Render the empresas page"""
     st.title("Gestão de Empresas")
     
-    # Add company button
-    if st.button("+ Adicionar Nova Empresa"):
-        st.session_state.show_add_company = True
-        
-    # Show add company form
-    if st.session_state.get('show_add_company', False):
-        add_new_company()
-        st.divider()
+    # Add buttons in columns
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("+ Adicionar Nova Empresa"):
+            st.session_state.show_add_company = True
+            st.session_state.show_delete_company = False
+    with col2:
+        if st.button("- Excluir Empresa"):
+            st.session_state.show_delete_company = True
+            st.session_state.show_add_company = False
     
     supabase = SupabaseManager()
     
@@ -125,26 +127,28 @@ def render_empresas():
             on_change=lambda: st.session_state.update({'data_editor_changed': True})
         )
 
-        # Add delete section with dropdown
-        st.write("### Excluir Empresa")
-        # Create options dictionary with format "Nome - CNPJ": id
-        delete_options = {f"{row['nome']} - {row['cnpj']}": row['id'] for idx, row in original_df.iterrows()}
-        
-        # Add a "Selecione..." option
-        delete_options = {"Selecione...": None, **delete_options}
-        
-        # Create the selectbox
-        selected_company = st.selectbox(
-            "Selecione a empresa para excluir",
-            options=list(delete_options.keys()),
-            key="delete_company_select"
-        )
-        
-        # Add delete button
-        if selected_company != "Selecione..." and st.button("Excluir Empresa", type="primary"):
-            company_id = delete_options[selected_company]
-            if company_id:
-                delete_company(company_id)
+        # Show delete company section
+        if st.session_state.get('show_delete_company', False):
+            st.subheader("Excluir Empresa")
+            # Create options dictionary with format "Nome - CNPJ": id
+            delete_options = {f"{row['nome']} - {row['cnpj']}": row['id'] for idx, row in original_df.iterrows()}
+            
+            # Add a "Selecione..." option
+            delete_options = {"Selecione...": None, **delete_options}
+            
+            # Create the selectbox
+            selected_company = st.selectbox(
+                "Selecione a empresa para excluir",
+                options=list(delete_options.keys()),
+                key="delete_company_select"
+            )
+            
+            # Add delete button
+            if selected_company != "Selecione..." and st.button("Excluir", type="primary"):
+                company_id = delete_options[selected_company]
+                if company_id:
+                    delete_company(company_id)
+            st.divider()
         
         # Process any edits
         if st.session_state.get('data_editor_changed', False):
