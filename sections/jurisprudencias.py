@@ -59,6 +59,16 @@ def add_new_jurisprudencia():
             except Exception as e:
                 st.error(f"Erro ao adicionar jurisprudência: {str(e)}")
 
+def delete_jurisprudencia(jurisprudencia_id):
+    """Delete a jurisprudencia from the database"""
+    supabase = SupabaseManager()
+    try:
+        supabase.delete_jurisprudencia(jurisprudencia_id)
+        st.success("Jurisprudência excluída com sucesso!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Erro ao excluir jurisprudência: {str(e)}")
+
 def render_jurisprudencias():
     """Render the jurisprudencias page"""
     st.title("Jurisprudências")
@@ -92,8 +102,11 @@ def render_jurisprudencias():
         # Create a copy of original data for comparison
         original_df = df.copy()
         
+        # Add delete button column
+        df['Ações'] = None
+        
         # Reorder columns
-        columns_order = ['id', 'created_at', 'nome', 'secao', 'Tribunal', 'texto']
+        columns_order = ['id', 'created_at', 'nome', 'secao', 'Tribunal', 'texto', 'Ações']
         df = df.reindex(columns=columns_order)
         
         # Rename columns
@@ -103,7 +116,8 @@ def render_jurisprudencias():
             'nome': 'Nome',
             'texto': 'Texto',
             'secao': 'Seção',
-            'Tribunal': 'Tribunal'
+            'Tribunal': 'Tribunal',
+            'Ações': 'Ações'
         }
         df = df.rename(columns=column_names)
         
@@ -111,7 +125,7 @@ def render_jurisprudencias():
         df = df.sort_values('Seção')
         
         # Get visible columns (excluding 'ID')
-        visible_columns = ['Data de Criação', 'Nome', 'Seção', 'Tribunal', 'Texto']
+        visible_columns = ['Data de Criação', 'Nome', 'Seção', 'Tribunal', 'Texto', 'Ações']
         
         # Display editable table
         edited_df = st.data_editor(
@@ -119,9 +133,24 @@ def render_jurisprudencias():
             hide_index=True,
             column_order=visible_columns,
             key="jurisprudencia_editor",
-            disabled=['ID', 'Data de Criação'],
+            disabled=['ID', 'Data de Criação', 'Ações'],
+            column_config={
+                "Ações": st.column_config.ButtonColumn(
+                    "Ações",
+                    help="Ações disponíveis",
+                    default=False,
+                    label="Excluir",
+                    width="small"
+                )
+            },
             on_change=lambda: st.session_state.update({'data_editor_changed': True})
         )
+        
+        # Handle delete actions
+        for idx, row in edited_df.iterrows():
+            if row['Ações']:  # If delete button was clicked
+                jurisprudencia_id = original_df.iloc[idx]['id']
+                delete_jurisprudencia(jurisprudencia_id)
         
         # Process any edits
         if st.session_state.get('data_editor_changed', False):

@@ -107,11 +107,14 @@ def render_empresas():
         # Convert to DataFrame
         df = pd.DataFrame(companies_data)
         
+        # Add delete button column
+        df['Ações'] = None
+        
         # Create a copy of original data for comparison
         original_df = df.copy()
         
         # Get visible columns (excluding 'id')
-        visible_columns = [col for col in df.columns if col != 'id']
+        visible_columns = ['nome', 'cnpj', 'endereco', 'Ações']
         
         # Display editable table
         edited_df = st.data_editor(
@@ -119,25 +122,37 @@ def render_empresas():
             hide_index=True,
             column_order=visible_columns,
             key="company_editor",
+            column_config={
+                "Ações": st.column_config.ButtonColumn(
+                    "Ações",
+                    help="Ações disponíveis",
+                    default=False,
+                    label="Excluir",
+                    width="small"
+                )
+            },
             on_change=lambda: st.session_state.update({'data_editor_changed': True})
         )
         
-        # Process any edits
+        # Handle both edits and deletes
         if st.session_state.get('data_editor_changed', False):
             edited_rows = {}
             
-            # Compare original and edited dataframes
+            # Handle delete actions and collect edits
             for idx, row in edited_df.iterrows():
-                changes = {}
-                original_row = original_df.iloc[idx]
-                
-                # Check each column for changes
-                for col in visible_columns:
-                    if row[col] != original_row[col]:
-                        changes[col] = row[col]
-                
-                if changes:  # If there are changes for this row
-                    edited_rows[idx] = changes
+                if row['Ações']:  # If delete button was clicked
+                    company_id = original_df.iloc[idx]['id']
+                    delete_company(company_id)
+                else:
+                    # Check for edits (existing logic)
+                    changes = {}
+                    original_row = original_df.iloc[idx]
+                    for col in visible_columns:
+                        if col != 'Ações' and row[col] != original_row[col]:
+                            changes[col] = row[col]
+                    
+                    if changes:
+                        edited_rows[idx] = changes
             
             if edited_rows:
                 process_company_update(edited_rows, original_df)
