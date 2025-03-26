@@ -302,18 +302,18 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
             create_form_section("Dados do Cliente")
             col1, col2 = st.columns(2)
             with col1:
-                nome_completo = st.text_input("Nome Completo*", required=True)
-                nacionalidade = st.text_input("Nacionalidade*", value="Brasileiro(a)", required=True)
+                nome_completo = st.text_input("Nome Completo*")
+                nacionalidade = st.text_input("Nacionalidade*", value="Brasileiro(a)")
                 estado_civil = st.selectbox("Estado Civil*", 
-                    ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)"], required=True)
-                profissao = st.text_input("Profissão*", required=True)
-                email = st.text_input("E-mail*", required=True)
+                    ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)"])
+                profissao = st.text_input("Profissão*")
+                email = st.text_input("E-mail*")
             
             with col2:
-                celular = st.text_input("Celular*", required=True)
-                data_nascimento = st.date_input("Data de Nascimento*", required=True)
-                rg = st.text_input("RG*", required=True)
-                cpf = st.text_input("CPF*", required=True)
+                celular = st.text_input("Celular*")
+                data_nascimento = st.date_input("Data de Nascimento*")
+                rg = st.text_input("RG*")
+                cpf = st.text_input("CPF*")
             
             # Seção: Informações do Caso
             create_form_section("Informações do Caso")
@@ -324,7 +324,7 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
                     "Aéreo",
                     "Trânsito",
                     "Outros"
-                ], required=True)
+                ])
                 
             with col_caso2:
                 assunto_caso = st.selectbox("Assunto do Caso*", [
@@ -337,7 +337,7 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
                     "Multas",
                     "Lei Seca",
                     "Outros"
-                ], required=True)
+                ])
                 
             with col_caso3:
                 responsavel_comercial = st.selectbox("Responsável Comercial*", [
@@ -348,28 +348,28 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
                     "Fred",
                     "Mari",
                     "Outro"
-                ], required=True)
+                ])
             
             # Seção: Endereço
             create_form_section("Endereço")
             col3, col4 = st.columns(2)
             with col3:
-                endereco = st.text_input("Endereço Completo*", required=True)
-                bairro = st.text_input("Bairro*", required=True)
-                cidade = st.text_input("Cidade*", required=True)
+                endereco = st.text_input("Endereço Completo*")
+                bairro = st.text_input("Bairro*")
+                cidade = st.text_input("Cidade*")
             
             with col4:
                 estado = st.selectbox("Estado*", [
                     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", 
                     "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", 
                     "SP", "SE", "TO"
-                ], required=True)
-                cep = st.text_input("CEP*", required=True)
+                ])
+                cep = st.text_input("CEP*")
             
             # Seção: Documentos
             create_form_section("Documentos")
-            doc_identidade = st.file_uploader("Documento de Identidade*", type=['pdf', 'png', 'jpg', 'jpeg'], required=True)
-            doc_residencia = st.file_uploader("Comprovante de Residência*", type=['pdf', 'png', 'jpg', 'jpeg'], required=True)
+            doc_identidade = st.file_uploader("Documento de Identidade*", type=['pdf', 'png', 'jpg', 'jpeg'])
+            doc_residencia = st.file_uploader("Comprovante de Residência*", type=['pdf', 'png', 'jpg', 'jpeg'])
             outros_docs = st.file_uploader("Outros Documentos", type=['pdf', 'png', 'jpg', 'jpeg'], accept_multiple_files=True)
             
             submitted = st.form_submit_button("Cadastrar")
@@ -395,6 +395,7 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
                     'Comprovante de Residência': doc_residencia
                 }
                 
+                # Verificar campos vazios
                 missing_fields = [field for field, value in required_fields.items() if not value]
                 if missing_fields:
                     st.error(f"Por favor, preencha os seguintes campos obrigatórios: {', '.join(missing_fields)}")
