@@ -39,18 +39,6 @@ def render_sidebar():
         
     st.sidebar.divider()  # Separador
     
-    # Seção Banco de Dados
-    st.sidebar.markdown("#### Banco de Dados")
-    if st.sidebar.button("Empresas", use_container_width=True):
-        st.session_state.current_page = "empresas"
-        st.rerun()
-    
-    if st.sidebar.button("Jurisprudências", use_container_width=True):
-        st.session_state.current_page = "jurisprudencias"
-        st.rerun()
-    
-    st.sidebar.divider()  # Separador
-    
     # Seção Jurídico
     st.sidebar.markdown("#### Jurídico")
     if st.sidebar.button("Atraso / Cancelamento de Voo", use_container_width=True):
@@ -59,6 +47,18 @@ def render_sidebar():
     
     if st.sidebar.button("Bagagem Danificada", use_container_width=True):
         st.session_state.current_page = "bagagem_danificada"
+        st.rerun()
+    
+    st.sidebar.divider()  # Separador
+    
+    # Seção Banco de Dados
+    st.sidebar.markdown("#### Banco de Dados")
+    if st.sidebar.button("Empresas", use_container_width=True):
+        st.session_state.current_page = "empresas"
+        st.rerun()
+    
+    if st.sidebar.button("Jurisprudências", use_container_width=True):
+        st.session_state.current_page = "jurisprudencias"
         st.rerun()
     
     st.sidebar.divider()  # Separador
