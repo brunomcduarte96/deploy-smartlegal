@@ -33,11 +33,12 @@ def add_new_jurisprudencia():
         nome = st.text_input("Nome")
         texto = st.text_area("Texto")
         secao = st.text_input("Seção")
+        tribunal = st.text_input("Tribunal")
         
         submitted = st.form_submit_button("Adicionar")
         
         if submitted:
-            if not nome or not texto or not secao:
+            if not nome or not texto or not secao or not tribunal:
                 st.error("Todos os campos são obrigatórios")
                 return
                 
@@ -47,6 +48,7 @@ def add_new_jurisprudencia():
                     'nome': nome,
                     'texto': texto,
                     'secao': secao,
+                    'tribunal': tribunal,
                     'created_at': datetime.now().isoformat()
                 }
                 
@@ -91,7 +93,7 @@ def render_jurisprudencias():
         original_df = df.copy()
         
         # Reorder columns
-        columns_order = ['id', 'created_at', 'nome', 'texto', 'secao']
+        columns_order = ['id', 'created_at', 'nome', 'texto', 'secao', 'tribunal']
         df = df.reindex(columns=columns_order)
         
         # Rename columns
@@ -100,7 +102,8 @@ def render_jurisprudencias():
             'created_at': 'Data de Criação',
             'nome': 'Nome',
             'texto': 'Texto',
-            'secao': 'Seção'
+            'secao': 'Seção',
+            'tribunal': 'Tribunal'
         }
         df = df.rename(columns=column_names)
         
@@ -130,7 +133,7 @@ def render_jurisprudencias():
                 original_row = original_df.iloc[idx]
                 
                 # Check each column for changes
-                for col in ['nome', 'texto', 'secao']:
+                for col in ['nome', 'texto', 'secao', 'tribunal']:
                     new_value = row[column_names[col]]
                     if new_value != original_row[col]:
                         changes[col] = new_value
