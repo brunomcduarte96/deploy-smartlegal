@@ -33,12 +33,12 @@ def add_new_jurisprudencia():
         nome = st.text_input("Nome")
         texto = st.text_area("Texto")
         secao = st.text_input("Seção")
-        tribunal = st.text_input("Tribunal")
+        Tribunal = st.text_input("Tribunal")
         
         submitted = st.form_submit_button("Adicionar")
         
         if submitted:
-            if not nome or not texto or not secao or not tribunal:
+            if not nome or not texto or not secao or not Tribunal:
                 st.error("Todos os campos são obrigatórios")
                 return
                 
@@ -48,7 +48,7 @@ def add_new_jurisprudencia():
                     'nome': nome,
                     'texto': texto,
                     'secao': secao,
-                    'tribunal': tribunal,
+                    'Tribunal': Tribunal,
                     'created_at': datetime.now().isoformat()
                 }
                 
@@ -93,7 +93,7 @@ def render_jurisprudencias():
         original_df = df.copy()
         
         # Reorder columns
-        columns_order = ['id', 'created_at', 'nome', 'texto', 'secao', 'tribunal']
+        columns_order = ['id', 'created_at', 'nome', 'texto', 'secao', 'Tribunal']
         df = df.reindex(columns=columns_order)
         
         # Rename columns
@@ -103,7 +103,7 @@ def render_jurisprudencias():
             'nome': 'Nome',
             'texto': 'Texto',
             'secao': 'Seção',
-            'tribunal': 'Tribunal'
+            'Tribunal': 'Tribunal'
         }
         df = df.rename(columns=column_names)
         
@@ -133,7 +133,7 @@ def render_jurisprudencias():
                 original_row = original_df.iloc[idx]
                 
                 # Check each column for changes
-                for col in ['nome', 'texto', 'secao', 'tribunal']:
+                for col in ['nome', 'texto', 'secao', 'Tribunal']:
                     new_value = row[column_names[col]]
                     if new_value != original_row[col]:
                         changes[col] = new_value
