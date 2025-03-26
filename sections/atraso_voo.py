@@ -257,9 +257,11 @@ def extract_flight_info(fatos_cliente):
 def generate_facts():
     """Gera os fatos usando a API da OpenAI"""
     try:
-        client = OpenAI()
-        # Adicionar o cabeçalho beta para v2
-        client.headers["OpenAI-Beta"] = "assistants=v2"
+        # Inicializar o cliente OpenAI com a configuração beta
+        client = OpenAI(
+            api_key=st.secrets["OPENAI_API_KEY"],
+            default_headers={"OpenAI-Beta": "assistants=v2"}
+        )
         
         message_content = f"""
         INFORMAÇÕES DO VOO:
@@ -288,7 +290,7 @@ def generate_facts():
 
         # Criar a mensagem para o assistente
         response = client.chat.completions.create(
-            model="gpt-4-1106-preview",  # ou outro modelo compatível
+            model="gpt-4-1106-preview",
             messages=[
                 {"role": "system", "content": "Você é um assistente jurídico especializado em gerar narrativas dos fatos para petições iniciais de casos de atraso ou cancelamento de voo."},
                 {"role": "user", "content": message_content}
