@@ -705,7 +705,6 @@ def render_facts_section():
     # Seção Jurisprudência Seção Deveres do Transportador
     st.markdown("### 5. Jurisprudência Seção Deveres do Transportador")
     
-    # Adicionar campo de Jurisprudência
     try:
         supabase = SupabaseManager()
         jurisprudencias = supabase.get_jurisprudencias_aereo()
@@ -717,10 +716,15 @@ def render_facts_section():
                 for jurisprudencia in jurisprudencias
             }
             
+            # Definir o valor padrão
+            default_option = "cancelamento_voo_sem_aviso_indenizacao_10k"
+            default_index = list(jurisprudencia_options.keys()).index(default_option) if default_option in jurisprudencia_options else 0
+            
             # Dropdown para seleção da jurisprudência
             selected_jurisprudencia = st.selectbox(
                 "Selecione a Jurisprudência - Seção Deveres do Transportador",
                 options=list(jurisprudencia_options.keys()),
+                index=default_index,
                 key="jurisprudencia_select"
             )
             
@@ -746,28 +750,23 @@ def render_facts_section():
     # Seção Jurisprudência Seção Da Inteligência
     st.markdown("### 6. Jurisprudência Seção Da Inteligência")
     
-    # Adicionar campo de Jurisprudência da Inteligência
     try:
-        supabase = SupabaseManager()
-        jurisprudencias = supabase.get_jurisprudencias_aereo()
-        
         if jurisprudencias:
-            # Criar dicionário com nome como chave e dados completos como valor
-            jurisprudencia_options_intel = {
-                jurisprudencia['nome']: jurisprudencia 
-                for jurisprudencia in jurisprudencias
-            }
+            # Definir o valor padrão
+            default_option = "atraso_conexao_internacional_24h_indenizacao_10k"
+            default_index = list(jurisprudencia_options.keys()).index(default_option) if default_option in jurisprudencia_options else 0
             
             # Dropdown para seleção da jurisprudência
             selected_jurisprudencia_intel = st.selectbox(
                 "Selecione a Jurisprudência - Seção Da Inteligência",
-                options=list(jurisprudencia_options_intel.keys()),
+                options=list(jurisprudencia_options.keys()),
+                index=default_index,
                 key="jurisprudencia_intel_select"
             )
             
             if selected_jurisprudencia_intel:
                 # Mostrar detalhes da jurisprudência selecionada
-                jurisprudencia_data_intel = jurisprudencia_options_intel[selected_jurisprudencia_intel]
+                jurisprudencia_data_intel = jurisprudencia_options[selected_jurisprudencia_intel]
                 
                 # Salvar no session_state
                 st.session_state['tribunal_jurisprudencia_da_inteligencia'] = jurisprudencia_data_intel['Tribunal']
@@ -787,28 +786,23 @@ def render_facts_section():
     # Seção Jurisprudência Seção Da Responsabilidade
     st.markdown("### 7. Jurisprudência Seção Da Responsabilidade")
     
-    # Adicionar campo de Jurisprudência da Responsabilidade
     try:
-        supabase = SupabaseManager()
-        jurisprudencias = supabase.get_jurisprudencias_aereo()
-        
         if jurisprudencias:
-            # Criar dicionário com nome como chave e dados completos como valor
-            jurisprudencia_options_resp = {
-                jurisprudencia['nome']: jurisprudencia 
-                for jurisprudencia in jurisprudencias
-            }
+            # Definir o valor padrão
+            default_option = "atraso_voo_ma_assistencia_30h_indenizacao_15k"
+            default_index = list(jurisprudencia_options.keys()).index(default_option) if default_option in jurisprudencia_options else 0
             
             # Dropdown para seleção da jurisprudência
             selected_jurisprudencia_resp = st.selectbox(
                 "Selecione a Jurisprudência - Seção Da Responsabilidade",
-                options=list(jurisprudencia_options_resp.keys()),
+                options=list(jurisprudencia_options.keys()),
+                index=default_index,
                 key="jurisprudencia_resp_select"
             )
             
             if selected_jurisprudencia_resp:
                 # Mostrar detalhes da jurisprudência selecionada
-                jurisprudencia_data_resp = jurisprudencia_options_resp[selected_jurisprudencia_resp]
+                jurisprudencia_data_resp = jurisprudencia_options[selected_jurisprudencia_resp]
                 
                 # Salvar no session_state
                 st.session_state['tribunal_jurisprudencia_da_responsabilidadea'] = jurisprudencia_data_resp['Tribunal']
@@ -830,28 +824,23 @@ def render_facts_section():
     # Seção Jurisprudência Seção Dos Prejuízos
     st.markdown("### 8. Jurisprudência Seção Dos Prejuízos")
     
-    # Adicionar campo de Jurisprudência dos Prejuízos
     try:
-        supabase = SupabaseManager()
-        jurisprudencias = supabase.get_jurisprudencias_aereo()
-        
         if jurisprudencias:
-            # Criar dicionário com nome como chave e dados completos como valor
-            jurisprudencia_options_prej = {
-                jurisprudencia['nome']: jurisprudencia 
-                for jurisprudencia in jurisprudencias
-            }
+            # Definir o valor padrão
+            default_option = "cancelamento_voo_internacional_24h_indenizacao_10k"
+            default_index = list(jurisprudencia_options.keys()).index(default_option) if default_option in jurisprudencia_options else 0
             
             # Dropdown para seleção da jurisprudência
             selected_jurisprudencia_prej = st.selectbox(
                 "Selecione a Jurisprudência - Seção Dos Prejuízos",
-                options=list(jurisprudencia_options_prej.keys()),
+                options=list(jurisprudencia_options.keys()),
+                index=default_index,
                 key="jurisprudencia_prej_select"
             )
             
             if selected_jurisprudencia_prej:
                 # Mostrar detalhes da jurisprudência selecionada
-                jurisprudencia_data_prej = jurisprudencia_options_prej[selected_jurisprudencia_prej]
+                jurisprudencia_data_prej = jurisprudencia_options[selected_jurisprudencia_prej]
                 
                 # Salvar no session_state
                 st.session_state['tribunal_jurisprudencia_dos_prejuizos'] = jurisprudencia_data_prej['Tribunal']
