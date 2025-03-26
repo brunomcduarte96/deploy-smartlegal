@@ -7,5 +7,4 @@ libpng-dev
 libtiff-dev
 poppler-utils
 ffmpeg
-libavcodec-extra
-libav-tools 
+libavcodec-extra 
