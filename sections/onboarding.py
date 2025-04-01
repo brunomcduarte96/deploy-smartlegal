@@ -89,6 +89,11 @@ def render_onboarding():
     
     # Se não estiver mostrando o formulário completo, mostra a busca
     if not st.session_state.show_full_form:
+        # Botão de cadastrar novo cliente sempre visível
+        if st.button("+ Cadastrar Novo Cliente", type="primary"):
+            st.session_state.show_full_form = True
+            st.rerun()
+        
         # Seção de busca de cliente
         st.header("Verificar Cliente Existente")
         
@@ -280,9 +285,6 @@ def render_onboarding():
             
             else:
                 st.warning("Nenhum cliente encontrado com esse nome.")
-                if st.button("Cadastrar Novo Cliente"):
-                    st.session_state.show_full_form = True
-                    st.rerun()
         
         else:
             st.info("👆 Digite o nome do cliente para verificar se já existe cadastro.")
