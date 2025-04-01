@@ -286,21 +286,22 @@ class GoogleManager:
             # Sempre atualiza a segunda planilha com o novo caso
             current_date = datetime.now(SP_TZ).strftime('%d/%m/%Y')
             values2 = [[
-                client_data['nome_completo'],      # A: Cliente
-                current_date,                      # B: Data Entrada
-                caso_data['responsavel_comercial'], # C: Responsavel Comercial
-                caso_data['caso'],                # D: Caso
-                caso_data['assunto_caso'],        # E: Assunto Caso
-                "",                               # F: Quem está fazendo (vazio)
-                "Em andamento",                   # G: Status
-                "",                               # H: Data Audiencia (vazio)
-                caso_data['pasta_caso_url']       # I: Pasta Drive (agora é a pasta do caso)
+                client_data['nome_completo'],          # A: Cliente
+                caso_data['caso'],                     # B: Caso
+                caso_data['assunto_caso'],             # C: Assunto Caso
+                "Em andamento",                        # D: Status
+                "",                                    # E: Vazio
+                client_data['estado'],                 # F: Estado
+                caso_data['pasta_caso_url'],           # G: Pasta Drive
+                current_date,                          # H: Data Entrada
+                "SMARTLEGAL",                          # I: SMARTLEGAL
+                caso_data['responsavel_comercial']     # J: Responsavel Comercial
             ]]
             
             # Append direto na segunda planilha
             self.sheets_service.spreadsheets().values().append(
                 spreadsheetId=SHEET_ID_2,
-                range='A:I',
+                range='A:J',  # Atualizado para incluir até a coluna J
                 valueInputOption='USER_ENTERED',
                 insertDataOption='INSERT_ROWS',
                 body={'values': values2}
