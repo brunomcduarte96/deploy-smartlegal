@@ -259,23 +259,30 @@ def extract_flight_info(fatos_cliente):
 def generate_facts():
     """Gera os fatos usando a API da OpenAI"""
     try:
-        # Inicializar o cliente OpenAI com a configuração beta
+        # Inicializar o cliente OpenAI
         client = OpenAI(
-            api_key=st.secrets["OPENAI_API_KEY"],
-            default_headers={"OpenAI-Beta": "assistants=v2"}
+            api_key=st.secrets["OPENAI_API_KEY"]
         )
         
         # Verificar se flight_info existe no session_state
         if not hasattr(st.session_state, 'flight_info'):
             raise Exception("Informações do voo não encontradas. Por favor, preencha os dados do voo primeiro.")
 
-        # Criar o dicionário flight_info com valores padrão
+        # Obter o texto dos fatos relatados
+        fatos_relatados = st.session_state.get('transcription', '')
+
+        # Criar o dicionário flight_info com todos os campos
         flight_info = {
-            'numero_voo': st.session_state.flight_info.get('numero_voo', 'Não informado'),
-            'data_voo': st.session_state.flight_info.get('data_voo', 'Não informado'),
-            'horario_previsto': st.session_state.flight_info.get('horario_previsto', 'Não informado'),
-            'horario_real': st.session_state.flight_info.get('horario_real', 'Não informado'),
+            'tipo_voo': st.session_state.flight_info.get('tipo_voo', 'Não informado'),
+            'origem_voo': st.session_state.flight_info.get('origem_voo', 'Não informado'),
+            'destino_voo': st.session_state.flight_info.get('destino_voo', 'Não informado'),
+            'escala': st.session_state.flight_info.get('escala', 'Não informado'),
+            'data_voo_inicial': st.session_state.flight_info.get('data_voo_inicial', 'Não informado'),
+            'horario_voo_inicial': st.session_state.flight_info.get('horario_voo_inicial', 'Não informado'),
+            'data_voo_real': st.session_state.flight_info.get('data_voo_real', 'Não informado'),
+            'horario_voo_real': st.session_state.flight_info.get('horario_voo_real', 'Não informado'),
             'tempo_atraso': st.session_state.flight_info.get('tempo_atraso', 'Não informado'),
+            'motivo_voo': st.session_state.flight_info.get('motivo_voo', 'Não informado'),
             'problema': st.session_state.flight_info.get('problema', 'Não informado'),
             'local_problema': st.session_state.flight_info.get('local_problema', 'Não informado'),
             'momento_informacao': st.session_state.flight_info.get('momento_informacao', 'Não informado'),
@@ -291,12 +298,22 @@ def generate_facts():
         }
         
         message_content = f"""
+        FATOS RELATADOS PELO CLIENTE:
+        {fatos_relatados}
+        
         INFORMAÇÕES DO VOO:
-        - Número do Voo: {flight_info['numero_voo']}
-        - Data do Voo: {flight_info['data_voo']}
-        - Horário Previsto: {flight_info['horario_previsto']}
-        - Horário Real: {flight_info['horario_real']}
+        
+        DADOS DO VOO:
+        - Tipo: {flight_info['tipo_voo']}
+        - Origem: {flight_info['origem_voo']}
+        - Destino: {flight_info['destino_voo']}
+        - Escala: {flight_info['escala']}
+        - Data Prevista: {flight_info['data_voo_inicial']}
+        - Horário Previsto: {flight_info['horario_voo_inicial']}
+        - Data Real: {flight_info['data_voo_real']}
+        - Horário Real: {flight_info['horario_voo_real']}
         - Tempo de Atraso: {flight_info['tempo_atraso']}
+        - Motivo da Viagem: {flight_info['motivo_voo']}
         
         DETALHES DO PROBLEMA:
         - Problema: {flight_info['problema']}
@@ -315,17 +332,40 @@ def generate_facts():
         - Valor Total: {flight_info['valor_total_custos']}
         """
 
-        # Criar a mensagem para o assistente
-        response = client.chat.completions.create(
-            model="gpt-4-1106-preview",
-            messages=[
-                {"role": "system", "content": "Você é um assistente jurídico especializado em gerar narrativas dos fatos para petições iniciais de casos de atraso ou cancelamento de voo."},
-                {"role": "user", "content": message_content}
-            ]
+        # Criar um thread
+        thread = client.beta.threads.create()
+
+        # Adicionar a mensagem ao thread
+        message = client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=message_content
         )
 
-        # Extrair e retornar o texto gerado
-        generated_facts = response.choices[0].message.content
+        # Executar o assistente
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id="asst_Yjlfjp23PwM2qiN6ckjxUspB"
+        )
+
+        # Aguardar a conclusão
+        while True:
+            run_status = client.beta.threads.runs.retrieve(
+                thread_id=thread.id,
+                run_id=run.id
+            )
+            if run_status.status == 'completed':
+                break
+            time.sleep(1)  # Esperar 1 segundo antes de verificar novamente
+
+        # Obter a resposta
+        messages = client.beta.threads.messages.list(
+            thread_id=thread.id
+        )
+        
+        # A resposta mais recente é a primeira da lista
+        generated_facts = messages.data[0].content[0].text.value
+
         return generated_facts
 
     except Exception as e:
