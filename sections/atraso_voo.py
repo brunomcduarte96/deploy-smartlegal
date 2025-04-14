@@ -1185,7 +1185,7 @@ def render_atraso_voo():
     render_facts_section()
 
 def generate_and_save_petition(st_session_state):
-    """Gera e salva a petição preenchida na pasta do caso"""
+    """Gera e salva a petição preenchida na pasta do caso e permite download"""
     try:
         # Verificações detalhadas
         if 'selected_client_data' not in st_session_state:
@@ -1208,11 +1208,11 @@ def generate_and_save_petition(st_session_state):
         credentials_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
         creds = service_account.Credentials.from_service_account_info(
             credentials_dict,
-            scopes=['https://www.googleapis.com/auth/drive']  # Escopo completo do Drive
+            scopes=['https://www.googleapis.com/auth/drive']
         )
         drive_service = build('drive', 'v3', credentials=creds)
 
-        # Baixar o template (usando get_media para arquivo .docx)
+        # Baixar o template
         request = drive_service.files().get_media(
             fileId=st.secrets["TEMPLATE_ATRASO_VOO_ID"]
         )
@@ -1223,7 +1223,7 @@ def generate_and_save_petition(st_session_state):
         while done is False:
             status, done = downloader.next_chunk()
 
-        # Carregar o documento com python-docx
+        # Carregar o documento
         doc = Document(template_content)
 
         # Preparar os dados para substituição
@@ -1269,14 +1269,19 @@ def generate_and_save_petition(st_session_state):
                 if f'{{{{{key}}}}}' in paragraph.text:
                     paragraph.text = paragraph.text.replace(f'{{{{{key}}}}}', str(value))
 
-        # Salvar o documento modificado
-        output = io.BytesIO()
-        doc.save(output)
-        output.seek(0)
-
         # Nome do arquivo com data e hora
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         file_name = f"Petição Inicial - {timestamp}.docx"
+
+        # Salvar o documento em memória para download
+        doc_download = io.BytesIO()
+        doc.save(doc_download)
+        doc_download.seek(0)
+
+        # Salvar uma nova cópia para upload no Drive
+        doc_upload = io.BytesIO()
+        doc.save(doc_upload)
+        doc_upload.seek(0)
 
         # Criar arquivo no Google Drive
         file_metadata = {
@@ -1286,7 +1291,7 @@ def generate_and_save_petition(st_session_state):
         }
         
         media = MediaIoBaseUpload(
-            output, 
+            doc_upload, 
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             resumable=True
         )
@@ -1296,6 +1301,22 @@ def generate_and_save_petition(st_session_state):
             media_body=media,
             fields='id, webViewLink'
         ).execute()
+
+        # Criar colunas para os botões
+        col1, col2 = st.columns(2)
+        
+        # Botão para download
+        with col1:
+            st.download_button(
+                label="Download da Petição",
+                data=doc_download,
+                file_name=file_name,
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        
+        # Link para visualizar no Drive
+        with col2:
+            st.markdown(f"[Visualizar no Drive]({file.get('webViewLink')})")
 
         return file.get('webViewLink')
 
