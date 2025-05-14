@@ -166,10 +166,16 @@ class GoogleManager:
             except Exception as e:
                 raise DriveError(f"Erro ao salvar documento temporário: {str(e)}")
             
+            # Determina o nome do arquivo baseado no template
+            if "Contrato de Honorarios" in template_path:
+                file_prefix = f'Contrato de Honorarios - {data["nome_completo"]}'
+            else:
+                file_prefix = f'Procuracao_{data["nome_completo"]}'
+            
             # Upload do DOCX
             try:
                 docx_id = self.upload_file(
-                    f'Procuracao_{data["nome_completo"]}.docx',
+                    f'{file_prefix}.docx',
                     temp_docx.getvalue(),
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     folder_id
@@ -205,7 +211,7 @@ class GoogleManager:
             try:
                 pdf_content = self.export_to_pdf(temp_doc['id'])
                 pdf_id = self.upload_file(
-                    f'Procuracao_{data["nome_completo"]}.pdf',
+                    f'{file_prefix}.pdf',
                     pdf_content,
                     'application/pdf',
                     folder_id
@@ -390,4 +396,31 @@ class GoogleManager:
             self.drive_service.files().get(fileId=folder_id).execute()
             return f"https://drive.google.com/drive/folders/{folder_id}"
         except Exception as e:
-            raise DriveError(f"Erro ao gerar URL da pasta: {str(e)}") 
+            raise DriveError(f"Erro ao gerar URL da pasta: {str(e)}")
+
+    def get_files_in_folder(self, folder_id: str, query: str = None):
+        """
+        Busca arquivos em uma pasta do Google Drive
+        
+        Args:
+            folder_id: ID da pasta
+            query: Query adicional para filtrar arquivos
+        
+        Returns:
+            Lista de arquivos
+        """
+        try:
+            q = f"'{folder_id}' in parents"
+            if query:
+                q += f" and {query}"
+            
+            response = self.drive_service.files().list(
+                q=q,
+                spaces='drive',
+                fields='files(id, name, mimeType, webViewLink)'
+            ).execute()
+            
+            return response.get('files', [])
+        except Exception as e:
+            logger.error(f"Erro ao buscar arquivos na pasta: {str(e)}")
+            raise Exception(f"Erro ao buscar arquivos na pasta: {str(e)}") 

@@ -33,7 +33,7 @@ def render_sidebar():
         st.session_state.current_page = "clientes"
         st.rerun()
     
-    if st.sidebar.button("Gerar Documentos", use_container_width=True):
+    if st.sidebar.button("Enviar Email", use_container_width=True):
         st.session_state.current_page = "gerar_documentos"
         st.rerun()
         
@@ -104,7 +104,8 @@ def main():
     elif st.session_state.current_page == "empresas":
         render_empresas()
     elif st.session_state.current_page == "gerar_documentos":
-        st.info("Página em desenvolvimento")  # Placeholder até implementarmos
+        from sections.gerar_documentos import render_gerar_documentos
+        render_gerar_documentos()
 
 if __name__ == "__main__":
     st.set_page_config(

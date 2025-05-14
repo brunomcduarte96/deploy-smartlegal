@@ -262,6 +262,16 @@ def render_onboarding():
                                         case_folder_id
                                     )
                                     
+                                    # Gerando contrato de honorários
+                                    status_text.text("Gerando contrato de honorários...")
+                                    
+                                    # Usa os mesmos dados do template para o contrato
+                                    contrato_pdf_id, contrato_docx_id = google_manager.fill_document_template(
+                                        "Contrato de Honorarios.docx",
+                                        template_data,
+                                        case_folder_id
+                                    )
+                                    
                                     # 5. Atualizando planilhas (90%)
                                     status_text.text("Atualizando planilhas...")
                                     progress_bar.progress(90)
@@ -535,7 +545,17 @@ def render_full_form(supabase_manager: SupabaseManager, google_manager: GoogleMa
                     pdf_id, docx_id = google_manager.fill_document_template(
                         "Modelo Procuracao JEC.docx",
                         template_data,
-                        case_folder_id  # Salva na pasta do caso
+                        case_folder_id
+                    )
+                    
+                    # Gerando contrato de honorários
+                    status_text.text("Gerando contrato de honorários...")
+                    
+                    # Usa os mesmos dados do template para o contrato
+                    contrato_pdf_id, contrato_docx_id = google_manager.fill_document_template(
+                        "Contrato de Honorarios.docx",
+                        template_data,
+                        case_folder_id
                     )
                     
                     # 7. Atualizando planilhas (95%)
