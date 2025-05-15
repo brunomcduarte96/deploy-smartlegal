@@ -2,7 +2,7 @@ import json
 from typing import List, Dict, Any, Tuple
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaFileUpload
 from io import BytesIO
 from config.settings import (
     GOOGLE_CREDENTIALS,
@@ -23,6 +23,8 @@ from pathlib import Path
 import logging
 from unidecode import unidecode
 import pytz
+import tempfile
+import time
 
 # Configurar timezone de São Paulo
 SP_TZ = pytz.timezone('America/Sao_Paulo')
@@ -127,9 +129,16 @@ class GoogleManager:
         except Exception as e:
             raise Exception(f"Erro ao fazer upload do arquivo: {str(e)}")
 
-    def fill_document_template(self, template_path: str, data: Dict[str, str], folder_id: str) -> Tuple[str, str]:
+    def fill_document_template(self, template_path: str, data: Dict[str, str], folder_id: str, output_filename: str = None) -> Tuple[str, str]:
         """
         Preenche o template e salva como PDF e DOCX
+        
+        Args:
+            template_path: Caminho para o template
+            data: Dicionário com os dados para substituição
+            folder_id: ID da pasta onde salvar os arquivos
+            output_filename: Nome personalizado para o arquivo de saída (sem extensão)
+            
         Retorna: (pdf_id, docx_id)
         """
         try:
@@ -155,75 +164,82 @@ class GoogleManager:
                 for key, value in data.items():
                     if f"{{{{{key}}}}}" in paragraph.text:
                         paragraph.text = paragraph.text.replace(f"{{{{{key}}}}}", str(value))
-                logger.debug(f"Texto original: {original_text}")
-                logger.debug(f"Texto substituído: {paragraph.text}")
+                
+                # Log se houve substituição
+                if original_text != paragraph.text:
+                    logger.debug(f"Substituído: '{original_text}' -> '{paragraph.text}'")
             
-            # Salva o documento temporariamente
-            temp_docx = BytesIO()
-            try:
-                doc.save(temp_docx)
-                temp_docx.seek(0)
-            except Exception as e:
-                raise DriveError(f"Erro ao salvar documento temporário: {str(e)}")
+            # Substitui os placeholders nas tabelas
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            original_text = paragraph.text
+                            for key, value in data.items():
+                                if f"{{{{{key}}}}}" in paragraph.text:
+                                    paragraph.text = paragraph.text.replace(f"{{{{{key}}}}}", str(value))
+                            
+                            # Log se houve substituição
+                            if original_text != paragraph.text:
+                                logger.debug(f"Substituído em tabela: '{original_text}' -> '{paragraph.text}'")
             
-            # Determina o nome do arquivo baseado no template
-            if "Contrato de Honorarios" in template_path:
-                file_prefix = f'Contrato de Honorarios - {data["nome_completo"]}'
+            # Define o nome do arquivo temporário
+            temp_docx_path = os.path.join(tempfile.gettempdir(), f"temp_{int(time.time())}.docx")
+            
+            # Salva o documento temporário
+            doc.save(temp_docx_path)
+            logger.info(f"Documento temporário salvo em: {temp_docx_path}")
+            
+            # Define o nome do arquivo final
+            if output_filename:
+                file_name = output_filename
             else:
-                file_prefix = f'Procuracao_{data["nome_completo"]}'
+                # Usa o nome do template sem a extensão
+                file_name = os.path.splitext(os.path.basename(template_path))[0]
             
-            # Upload do DOCX
-            try:
-                docx_id = self.upload_file(
-                    f'{file_prefix}.docx',
-                    temp_docx.getvalue(),
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    folder_id
-                )
-                logger.info(f"DOCX criado com ID: {docx_id}")
-            except Exception as e:
-                raise DriveError(f"Erro ao fazer upload do DOCX: {str(e)}")
+            # Upload do DOCX para o Drive
+            docx_metadata = {
+                'name': f"{file_name}.docx",
+                'parents': [folder_id],
+                'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            }
             
-            # Converte para Google Docs temporariamente para gerar PDF
-            try:
-                file_metadata = {
-                    'name': 'temp_doc',
-                    'mimeType': 'application/vnd.google-apps.document',
-                    'parents': [folder_id]
-                }
-                
-                media = MediaIoBaseUpload(
-                    temp_docx,
-                    mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    resumable=True
-                )
-                
-                temp_doc = self.drive_service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id'
-                ).execute()
-                logger.info(f"Documento temporário criado com ID: {temp_doc['id']}")
-            except Exception as e:
-                raise DriveError(f"Erro ao criar documento temporário: {str(e)}")
+            docx_media = MediaFileUpload(temp_docx_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            docx_file = self.drive_service.files().create(body=docx_metadata, media_body=docx_media, fields='id').execute()
+            docx_id = docx_file.get('id')
             
-            # Exporta como PDF
-            try:
-                pdf_content = self.export_to_pdf(temp_doc['id'])
-                pdf_id = self.upload_file(
-                    f'{file_prefix}.pdf',
-                    pdf_content,
-                    'application/pdf',
-                    folder_id
-                )
-                logger.info(f"PDF criado com ID: {pdf_id}")
-            except Exception as e:
-                raise DriveError(f"Erro ao gerar PDF: {str(e)}")
+            logger.info(f"DOCX enviado para o Drive. ID: {docx_id}")
             
-            # Remove o documento temporário
+            # Converte para PDF
+            pdf_metadata = {
+                'name': f"{file_name}.pdf",
+                'parents': [folder_id],
+                'mimeType': 'application/pdf'
+            }
+            
+            self.drive_service.files().copy(
+                fileId=docx_id,
+                body=pdf_metadata,
+                fields='id'
+            ).execute()
+            
+            # Busca o PDF recém-criado
+            pdf_files = self.drive_service.files().list(
+                q=f"name='{file_name}.pdf' and '{folder_id}' in parents",
+                spaces='drive',
+                fields='files(id, name)'
+            ).execute().get('files', [])
+            
+            if not pdf_files:
+                raise DriveError("PDF não encontrado após conversão")
+            
+            pdf_id = pdf_files[0].get('id')
+            logger.info(f"PDF criado no Drive. ID: {pdf_id}")
+            
+            # Limpa o arquivo temporário
             try:
-                self.drive_service.files().delete(fileId=temp_doc['id']).execute()
-                logger.info("Documento temporário removido")
+                os.remove(temp_docx_path)
+                logger.info(f"Arquivo temporário removido: {temp_docx_path}")
             except Exception as e:
                 logger.warning(f"Erro ao remover documento temporário: {str(e)}")
             
